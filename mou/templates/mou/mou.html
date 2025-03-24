@@ -1,0 +1,666 @@
+{% extends "cis/logged-base.html" %}
+{%block title %}{{ page_title }}{% endblock %}
+
+{% load templatehelpers %}
+{% load crispy_forms_tags %}
+
+{% block body %}
+
+{% if not record.can_edit %}
+    <style>
+        .hide_on_no_edit {
+            display: none;
+        }
+    </style>
+{% endif %}
+<script>
+    var inputsChanged = false;
+    $(document).on('change', 'form#frm_bulk_message input, form#frm_bulk_message textarea', function () {
+        inputsChanged = true;
+    })
+
+
+    jQuery(document).ready(function ($) {
+        $("input.delete").on("click", function () {
+            if (!confirm("Are you sure you want to permanently delete this record?"))
+                return;
+
+            let url = "{% url 'mou_ce:mou_delete' record.id %}"
+            let modal = "modal-bulk_actions"
+            let data = ""
+
+            $.ajax({
+                type: "GET",
+                url: url,
+                data: data,
+                success: function (response) {
+                    swal({
+                        title: 'Success',
+                        text: response.message,
+                        icon: response.status
+                    }).then(
+                        (value) => {
+                            inputsChanged = false
+                            if (response.action == 'redirect_to')
+                                location.href = response.redirect_to
+
+                            if (response.action == 'reload')
+                                location.reload();
+                        }
+                    )
+                },
+                error: function (xhr, status, errorThrown) {
+                    var span = document.createElement('span')
+                    span.innerHTML = xhr.responseJSON.errors
+
+                    swal({
+                        title: 'Unable to complete request',
+                        content: span,
+                        icon: 'warning'
+                    });
+                }
+            });
+
+            return false;
+        });
+    });
+
+    function preview_message(record_id) {
+
+        event.preventDefault();
+
+        if (inputsChanged) {
+            alert('One of more fields in form is not yet saved. Please save the form first');
+            return false
+        }
+
+        let url = "/ce/announcements/bulk_message/preview/" + record_id
+        let modal = "modal-bulk_actions"
+        let data = ""
+
+        $.ajax({
+            type: "GET",
+            url: url,
+            data: data,
+            success: function (response) {
+                $("#bulk_modal_content").html(response);
+                $("#" + modal).modal('show');
+            },
+            error: function (xhr, status, errorThrown) {
+                var span = document.createElement('span')
+                span.innerHTML = 'Error'
+
+                swal({
+                    title: 'Unable to complete request',
+                    content: span,
+                    icon: 'warning'
+                });
+            }
+        });
+
+        return false;
+    }
+
+    jQuery(document).ready(function ($) {
+
+        $('form.frm_ajax').submit(function (event) {
+
+            var blocked_element = $(this).parent()
+            // $(blocked_element).block();
+            event.preventDefault()
+
+            form = $(this)
+
+            if ($("input, select, textarea").hasClass('is-invalid'))
+                $("input, select, textarea").removeClass('is-invalid')
+
+            if ($("input, select, textarea").next('p').length)
+                $("input, select, textarea").nextAll('p').empty();
+
+            let action = $(form).attr('action')
+            let first_element = '';
+
+            let form_id = $(form).attr("id")
+            var formData = new FormData(document.getElementById(form_id))
+
+            if(form_id == 'frm_bulk_message_finalize') {
+                if(inputsChanged) {
+                    alert('Please save the message form before updating the status')
+                    return;
+                }
+            }
+
+            $.post({
+                url: action,
+                data: formData,
+                processData: false,
+                contentType: false,
+                error: function (xhr, status, error) {
+
+                    let errors = $.parseJSON(xhr.responseJSON.errors);
+
+                    for (var name in errors) {
+                        for (var i in errors[name]) {
+                            var $input = $("[name='" + name + "']");
+                            $input.addClass('is-invalid');
+
+                            $input.after("<p class='invalid-feedback'><strong class=''>" + errors[name][i].message + "</strong></p>");
+                        }
+
+                        if (first_element == '')
+                            $input.focus()
+                        else {
+                            first_element = '-'
+                        }
+                    }
+
+                    var span = document.createElement('span')
+                    span.innerHTML = xhr.responseJSON.message
+                    swal({
+                        title: xhr.responseJSON.message,
+                        content: span,
+                        icon: 'warning'
+                    });
+
+                    $(blocked_element).unblock();
+                },
+                success: function (response) {
+                    swal({
+                        title: 'Success',
+                        text: response.message,
+                        icon: response.status
+                    }).then(
+                        (value) => {
+                            inputsChanged = false
+                            if (response.action == 'redirect_to')
+                                location.href = response.redirect_to
+
+                            if (response.action == 'reload')
+                                location.reload();
+                        }
+                    )
+                    $(blocked_element).unblock();
+                }
+            })
+            return false
+        });
+
+    });
+</script>
+
+<div class="">
+    <div class="row">
+        <div class="col-md-6 col-sm-12">
+            <h1 class="h3 mt-3 text-gray-800 mb-3">{{ record.name }}</h1>
+        </div>
+    </div>
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="#">Home</a></li>
+            <li class="breadcrumb-item"><a href="/ce/highschools/mous">All MOUs</a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">{{ record.title }}</li>
+        </ol>
+    </nav>
+</div>
+<main>
+    <div class="">
+        <div class="row">
+            {% if messages %}
+                <div class="col-12">
+                    <ul class="messages list-group">
+                        {% for message in messages %}
+                        <li{% if message.tags %} class="list-group-item {{ message.tags }}" {% endif %}>{{ message }}</li>
+                            {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h3 class="card-title">Finalize and Send</h3>
+                        <hr>
+                        <div class="card-text">
+
+                            {% if record.can_edit or True %}
+                                <form action="{% url 'mou_ce:mou' record.id %}" method="POST"
+                                class="frm_ajax" id="frm_mou_finalize">
+                                    
+                                    {% csrf_token %}
+                                    {{ finalize_form | crispy }}
+                                
+                                    <input type="submit" class="btn btn-primary btn-sm" value="Save">
+                                    <input type="button" value="Delete" class="btn btn-danger btn-sm delete float-right">
+                                </form>
+                            {% else %}
+                                <p class="alert alert-info">The MOU has been marked as ready and cannot be edited.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-9 col-sm-12 mb-4">
+
+                <ul class="nav nav-tabs">
+                    <li class="nav-item">
+                        <a class="nav-link active" data-toggle="tab" href="#message">Manage MOU Text</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-toggle="tab" href="#manage_signators">Manage Signator(s)</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-toggle="tab" href="#manage_signatures">Manage Signature(s)</a>
+                    </li>
+                    <li class="nav-item d-none">
+                        <a class="nav-link" data-toggle="tab" href="#send_log">Send Log(s)</a>
+                    </li>
+                </ul>
+                <div class="tab-content">
+                    
+                    <div class="tab-pane" id="manage_signatures">
+                        <div class="card border-top-0">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    MOU Signatures
+                                </h5>
+
+                                <div>
+                                    <table id="table_signatures" class="table table-striped" style="width:100%"
+                                    data-server-side="true" data-ajax="{{signatures_api}}">
+                                        <thead>
+                                            <tr>
+                                                <th></th>
+                                                <th data-data="highschool.name" data-name="highschool.name">School
+                                                </th>
+                                                <th data-data="signator.last_name" data-name="signator.last_name">Signator
+                                                </th>
+                                                <th data-data="signator_template.weight" data-name="signator_template.weight">Weight
+                                                </th>
+                                                <th data-data="status" data-name="status">Status
+                                                </th>
+                                                <th data-data="id" data-name='id'>Action</th>
+                                            </tr>
+                                        </thead>
+                                    </table>
+                                    <table>
+
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="tab-pane" id="manage_signators">
+                        <div class="card border-top-0">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    MOU Signator(s)
+                                </h5>
+
+                                <div>
+                                    <table id="table_signators" class="table table-striped" style="width:100%"
+                                    data-server-side="true" data-ajax="{{signators_api}}">
+                                        <thead>
+                                            <tr>
+                                                <th></th>
+                                                <th data-data="weight" data-name="weight">Weight
+                                                </th>
+                                                <th data-data="role_type" data-name="role_type">Role Type
+                                                </th>
+                                                <th data-data="sexy_role" data-name="sexy_role">Role
+                                                </th>
+                                                <th data-data="complete_extra_form" data-name="complete_extra_form">
+                                                    Complete Extra Form
+                                                </th>
+                                                <th data-data="id" data-name='id'>Action</th>
+                                            </tr>
+                                        </thead>
+                                    </table>
+                                    <table>
+
+                                    </table>
+                                    <hr>
+
+                                    <div id="mou_editor">
+                                        {%if signator %}
+                                            <h4>Edit Signator</h4>
+                                        {% else %}
+                                            {% if record.can_edit %}
+                                                <h4>Add New Signator</h4>
+                                            {% endif %}
+                                        {% endif %}
+
+                                        {% if record.can_edit %}
+                                            <div class="clearfix">&nbsp;</div>
+                                            {{form_signator.media}}
+
+                                            <form action="{% url 'mou_ce:mou' record.id %}" method="POST"
+                                        class="frm_ajax" id="frm_mou_signator">
+                                                {% csrf_token %}
+                                                {{ form_signator | crispy }}
+                                                
+                                                {%if signator %}
+                                                <input type="submit" class="btn btn-primary btn-sm" value="Save Signator">
+                                                <a href="{{record.ce_url}}#manage_signators" class="btn btn-sm btn-info">Cancel</a>
+
+                                                <a href="{{signator.mou.ce_url}}?action=delete_signator&signator_id={{signator.id}}#manage_signators" class="btn btn-sm btn-danger float-right">Delete</a>
+                                                {% else %}
+                                                <input type="submit" class="btn btn-primary btn-sm" value="Add New Signator">
+                                                {% endif %}
+
+                                                <!-- <input type="button" class="btn btn-primary btn-sm" value="Save & Preview"> -->
+                                            </form>
+                                        {% endif %}
+
+                                    </div>
+                                </div>
+                                </h5>
+                            </div>
+                        </div>
+                    </div>
+
+
+                    <div class="tab-pane active" id="message">
+
+                        <div class="card border-top-0">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    MOU Editor
+                                    <div class="float-right d-none">
+                                        <small>
+                                            <a href="#" class="btn btn-sm btn-default btn-info"><i class="fa fa-link">&nbsp;</i>&nbsp;Preview</a>&nbsp;
+                                            <a href="#" class="btn btn-sm btn-primary"><i class="fa fa-download">&nbsp;</i>&nbsp;Download PDF</a>
+                                        </small>
+                                    </div>
+                                </h5>
+                                <div class="card-text">
+                                    
+                                    {{form.media}}
+                                    
+                                    <form action="{% url 'mou_ce:mou' record.id %}" method="POST"
+                                        class="frm_ajax" id="frm_mou">
+                                        {% csrf_token %}
+                                        {{ form | crispy }}
+                                        {% if record.can_edit %}
+                                            <input type="submit" class="btn btn-primary btn-sm" value="Save Message">
+                                        {% endif %}
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+
+                    <script>
+                        var tbl_records_bulk_message_recipient, 
+                        tbl_signators, tbl_signatures
+
+
+                        function refreshTable() {
+                            var selectedRows = tbl_signators.rows({ selected: true });
+                            selectedRows.deselect();
+                            
+                            var selectedRows = tbl_signatures.rows({ selected: true });
+                            selectedRows.deselect();
+
+                            tbl_signators.ajax.reload()
+                            tbl_signatures.ajax.reload()
+                        }
+                        function do_bulk_action(action, dt) {
+
+                            if(action == 'delete_all') {
+                                if(!confirm('Are you sure you want to delete all recipients?'))
+                                    return;
+
+                                url = "{%url 'announcements:bulk_message_delete_all_recipients' record.id %}"
+                                let modal = "modal-bulk_actions"
+
+                                $.ajax({
+                                    type: "GET",
+                                    url: url,
+                                    success: function(response) {
+                                        swal({
+                                                                title: 'Success',
+                                                                text: response.message,
+                                                                icon: response.status
+                                                            }).then(
+                                                                (value) => {        
+                                                                    if(response.action == 'reload')
+                                                                        location.reload();
+                                                                }
+                                                            )
+                                        
+                                    }
+                                });
+                            } else {
+                                if( action == 'add_highschools') {
+                                    let data = {
+                                        'action': action,
+                                        'mou_id': '{{record.id}}'
+                                    }
+
+                                    $(dt).block()
+                                    url = "{%url 'mou_ce:bulk_action' %}"
+                                    let modal = "modal-bulk_actions"
+
+                                    $.ajax({
+                                        type: "GET",
+                                        url: url,
+                                        data: data,
+                                        success: function(response) {
+                                            
+                                            $("#bulk_modal_content").html(response);
+                                            $("#" + modal).modal('show');
+                                        }
+                                    });
+                                } else {
+                                    if(!dt.rows('.selected').any()) {
+                                        alert("Please select a row and try again.")
+                                        return
+                                    }
+
+                                    var selectedRows = dt.rows({ selected: true });
+                                    let data = {
+                                        'action': action,
+                                        'ids': Array()
+                                    }
+                                    selectedRows.every(function() {
+                                        data.ids.push(this.id())
+                                    })
+
+                                    $(dt).block()
+                                    url = "{%url 'mou_ce:bulk_action' %}"
+                                    let modal = "modal-bulk_actions"
+
+                                    $.ajax({
+                                        type: "GET",
+                                        url: url,
+                                        data: data,
+                                        success: function(response) {
+
+                                            selectedRows.deselect();
+                                            
+                                            $("#bulk_modal_content").html(response);
+                                            $("#" + modal).modal('show');
+                                        }
+                                    });
+                                }
+                            }
+                        }
+
+                        jQuery(document).ready(function($) {
+
+
+                            tbl_signators = $('#table_signators').DataTable(
+                                {
+                                    columnDefs: [
+                                        {
+                                            orderable: false,
+                                            className: 'select-checkbox',
+                                            targets: 0
+                                        }
+                                    ],
+                                    select: {
+                                        style: 'os',
+                                        selector: 'td:first-child'
+                                    },
+                                    rowId: 'id',
+                                    dom: 'B<"float-left mt-3 mb-3"l><"float-right mt-3"f><"row clear">rt<"row"<"col-6"i><"col-6 float-right"p>>',
+                                            buttons: [
+                                                {
+                                                    extend: 'csv', className: 'btn btn-sm btn-primary text-white text-light',
+                                                    text: '<i class="fas fa-file-csv text-white"></i>&nbsp;CSV',
+                                                    titleAttr: 'Export results to CSV' 
+                                                },
+                                                { 
+                                                    extend: 'print', className: 'btn btn-sm btn-primary text-white text-light',
+                                                    text: '<i class="fas fa-print text-white"></i>&nbsp;Print',
+                                                    titleAttr: 'Print' 
+                                                },
+                                    {
+                                        className: 'btn btn-sm btn-primary text-white text-light hide_on_no_edit',
+                                        text: '<i class="fas fa-trash text-white "></i>&nbsp;Remove Selected',
+                                        titleAttr: 'Remove Selected',
+                                        action: function ( e, dt, node, config ) {
+                                            do_bulk_action('delete_signator', dt)
+                                        }
+                                    },
+                                            ],
+                                    order: [[1, 'asc']],
+                                    'columns': [
+                                        {
+                                            'searchable': false,
+                                            'orderable': false,
+                                            'render': function (data, type, row, meta) {
+                                                return ''
+                                            }
+                                        },
+                                        null,
+                                        null,
+                                        {
+                                            'searchable': false,
+                                            'orderable': false,
+                                        },
+                                        {
+                                            'searchable': false,
+                                            'orderable': false,
+                                        },
+                                        {
+                                            'searchable': false,
+                                            'orderable': false,
+                                            'render': function (data, type, row, meta) {
+                                                return "<a class='btn btn-sm btn-primary hide_on_no_edit' href='" + row.mou.ce_url + "?action=edit_signator&signator_id=" + row.id + "#manage_signators'>Edit</a>"
+                                            }
+                                        }
+                                    ]
+                                }
+                            );
+                            
+                            tbl_signatures = $('#table_signatures').DataTable(
+                                {
+                                    columnDefs: [
+                                        {
+                                            orderable: false,
+                                            className: 'select-checkbox',
+                                            targets: 0
+                                        }
+                                    ],
+                                    select: {
+                                        style: 'os',
+                                        selector: 'td:first-child'
+                                    },
+                                    rowId: 'id',
+                                    dom: 'B<"float-left mt-3 mb-3"l><"float-right mt-3"f><"row clear">rt<"row"<"col-6"i><"col-6 float-right"p>>',
+                                            buttons: [
+                                                {
+                                                    extend: 'csv', className: 'btn btn-sm btn-primary text-white text-light',
+                                                    text: '<i class="fas fa-file-csv text-white"></i>&nbsp;CSV',
+                                                    titleAttr: 'Export results to CSV' 
+                                                },
+                                                { 
+                                                    extend: 'print', className: 'btn btn-sm btn-primary text-white text-light',
+                                                    text: '<i class="fas fa-print text-white"></i>&nbsp;Print',
+                                                    titleAttr: 'Print' 
+                                                },
+                                                {
+                                                    className: 'btn btn-sm btn-primary text-white text-light hide_on_no_edit',
+                                                    text: '<i class="fas fa-trash text-white"></i>&nbsp;Remove',
+                                                    titleAttr: 'Remove',
+                                                    action: function ( e, dt, node, config ) {
+                                                        do_bulk_action('delete_signature', dt)
+                                                    }
+                                                },
+                                                {
+                                                    className: 'btn btn-sm btn-primary text-white text-light ',
+                                                    text: '<i class="fas fa-edit text-white"></i>&nbsp;Change Status',
+                                                    titleAttr: 'Change Status',
+                                                    action: function ( e, dt, node, config ) {
+                                                        do_bulk_action('change_signature_status', dt)
+                                                    }
+                                                },
+                                                {
+                                                    className: 'btn btn-sm btn-primary text-white text-light',
+                                                    text: '<i class="fas fa-plus text-white"></i>&nbsp;Add High School(s)',
+                                                    titleAttr: 'Add High School(s)',
+                                                    action: function ( e, dt, node, config ) {
+                                                        do_bulk_action('add_highschools', dt)
+                                                    }
+                                                },
+                                                {
+                                                    className: 'btn btn-sm btn-primary text-white text-light',
+                                                    text: '<i class="fas fa-edit text-white"></i>&nbsp;Get Signature Link',
+                                                    titleAttr: 'Get Signature Link',
+                                                    action: function ( e, dt, node, config ) {
+                                                        do_bulk_action('get_signature_link', dt)
+                                                    }
+                                                },
+                                                {
+                                                    className: 'btn btn-sm btn-primary text-white text-light',
+                                                    text: '<i class="fas fa-envelope text-white"></i>&nbsp;Send Signature Link',
+                                                    titleAttr: 'Send Signature Link',
+                                                    action: function ( e, dt, node, config ) {
+                                                        do_bulk_action('send_signature_link', dt)
+                                                    }
+                                                },
+                                            ],
+                                    order: [[1, 'asc']],
+                                    'columns': [
+                                        {
+                                            'searchable': false,
+                                            'orderable': false,
+                                            'render': function (data, type, row, meta) {
+                                                return ''
+                                            }
+                                        },
+                                        null,
+                                        {
+                                            'render': function (data, type, row, meta) {
+                                                return row.signator.last_name + ', ' + row.signator.first_name
+                                            }
+                                        },
+                                        null,
+                                        null,
+                                        {
+                                            'searchable': false,
+                                            'orderable': false,
+                                            'render': function (data, type, row, meta) {
+                                                return ''
+
+                                                return "<a class='btn btn-sm btn-primary hide_on_no_edit' href='" + row.mou.ce_url + "?action=edit_signator&signator_id=" + row.id + "#manage_signators'>Edit</a>"
+                                            }
+                                        }
+                                    ]
+                                }
+                            );
+                        })
+                    </script>
+                </div>
+
+            </div>
+            
+        </div>
+    </div>
+
+</main>
+{% endblock %}

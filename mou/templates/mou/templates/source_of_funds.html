@@ -1,0 +1,18 @@
+<div>
+    <div class="row">
+        <div class="col-12 mb-2">
+            <u>&nbsp;&nbsp;{{parent_pay}}&nbsp;&nbsp;</u>&nbsp;Parent pays the entire tuition to the school and school sends one check.
+        </div>
+        <div class="col-12 mb-2">
+            <u>&nbsp;&nbsp;{{split_pay}}&nbsp;&nbsp;</u>&nbsp;Parent pays $_{{parent_pay_percentage}}_____ and school/district pays $ __{{school_pay_percentage}}_____, then school sends one check.
+        </div>
+        <div class="col-12 mb-2">
+            <u>&nbsp;&nbsp;{{school_pay}}&nbsp;&nbsp;</u>&nbsp;School/district pays entire tuition.  
+            Parents will be sent a 1098 form by the IRS in late January. 
+            Schools that plan to use SCA funds are responsible for paying tuition directly to LSU.
+        </div>
+        <div class="col-12 mb-2">
+            <u>&nbsp;&nbsp;{{other}}&nbsp;&nbsp;</u>&nbsp;Other <u>{{other_pay|safe}}</u>
+        </div>
+    </div>
+</div>

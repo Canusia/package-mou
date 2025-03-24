@@ -1,0 +1,211 @@
+{% extends "cis/logged-base.html" %}
+{%block title %}{{ page_title }}{% endblock %}
+
+{% load templatehelpers %}
+
+{% load crispy_forms_tags %}
+
+{% block body %}
+<main>
+    <div class="">
+        <div class="row">
+            <div class="col-sm-6 col-xs-12">
+                <h1 class="h3 mb-4 text-gray-800">{{ page_title }}&nbsp;
+                    <a class="btn btn-primary btn-sm small collapsed" data-toggle="collapse" href="#addNewItem"
+                        role="button" aria-expanded="false" aria-controls="multiCollapseExample1"><i
+                            class="fa fa-plus"></i>&nbsp;Add New</a>
+                </h1>
+            </div>
+        </div>
+
+        <script>
+            jQuery(document).ready(function ($) {
+                
+                var tbl_active = $('#records_active').DataTable(
+                    {
+                        dom: 'B<"float-left mt-3 mb-3"l><"float-right mt-3"f><"row clear">rt<"row"<"col-6"i><"col-6 float-right"p>>',
+                                buttons: [
+                                    {
+                                        extend: 'csv', className: 'btn btn-sm btn-primary text-white text-light',
+                                        text: '<i class="fas fa-file-csv text-white"></i>&nbsp;CSV',
+                                        titleAttr: 'Export results to CSV' 
+                                    },
+                                    { 
+                                        extend: 'print', className: 'btn btn-sm btn-primary text-white text-light',
+                                        text: '<i class="fas fa-print text-white"></i>&nbsp;Print',
+                                        titleAttr: 'Print' 
+                                    },
+                                ],
+                        order: [[0, 'desc']],
+                        'columns': [
+                            null,
+                            null,
+                            {
+                                'render': function (data, type, row, meta) {
+                                    let status = row.sexy_status
+                                    if(row.send_on_after)
+                                        status += "<br><span class=''><small>After " + row.send_on_after + "</small></span>";
+                                    return status
+                                }
+                            },
+                            {
+                                'render': function (data, type, row, meta) {
+                                    return row.created_by.last_name + ', ' + row.created_by.first_name;
+                                }
+                            },
+                            {
+                                'searchable': false,
+                                'orderable': false,
+                                'render': function (data, type, row, meta) {
+                                    return "<a class='btn btn-sm btn-primary' href='" + row.ce_url + "'>View Details</a>"
+                                }
+                            }
+                        ]
+                    }
+                );
+
+                function reload_data() {
+                    tbl_active.ajax.reload(function(){}, false)
+                }
+
+                
+                $('form.frm_ajax').submit(function(event) {
+
+                    var blocked_element = $(this).parent()
+                    // $(blocked_element).block();
+                    event.preventDefault()
+
+                    form = $(this)
+
+                    if($("input, select, textarea").hasClass('is-invalid'))
+                        $("input, select, textarea").removeClass('is-invalid')
+
+                    if($("input, select, textarea").next('p').length) 
+                        $("input, select, textarea").nextAll('p').empty();
+
+                    let action = $(form).attr('action')
+                    let first_element = '';
+
+                    var formData = new FormData(document.getElementById("frm_add_new_item"))
+                    $.post({
+                        url: action,
+                        data: formData,
+                        processData: false,
+                        contentType: false,        
+                        error: function(xhr, status, error) {
+
+                            let errors = $.parseJSON(xhr.responseJSON.errors);
+                            
+                            for (var name in errors) {
+                                for (var i in errors[name]) {
+                                    var $input = $("[name='"+ name +"']");
+                                    $input.addClass('is-invalid');
+
+                                    $input.after("<p class='invalid-feedback'><strong class=''>" + errors[name][i].message + "</strong></p>");
+                                }
+
+                                if(first_element == '')
+                                    $input.focus()
+                                else {
+                                    first_element = '-'
+                                }
+                            }
+
+                            var span = document.createElement('span')
+                            span.innerHTML = xhr.responseJSON.message
+                            swal({
+                                title: xhr.responseJSON.message,
+                                content: span,
+                                icon: 'warning'
+                            });
+
+                            $(blocked_element).unblock();
+                        },
+                        success: function(response) {
+                            swal({
+                                title: 'Success',
+                                text: response.message,
+                                icon: response.status
+                            }).then(
+                                (value) => {
+                                    if(response.action == 'redirect_to')
+                                        location.href = response.redirect_to
+
+                                    if(response.action == 'reload')
+                                        location.reload();
+                                }
+                            )
+                            $(blocked_element).unblock();
+                        }
+                    })
+                    return false
+                });
+
+            });
+        </script>
+        <div class="row mb-3">
+            <div class="col-md-12">
+                <div class="collapse multi-collapse" id="addNewItem">
+                    <div class="card">
+                        <div class="card-body">
+                            <h4 class="card-title">Start New</h4>
+                            
+                            {{add_new_form.media}}
+
+                            <form action="{% url 'mou_ce:mou_add_new' %}" method="post"  enctype="multipart/form-data" id="frm_add_new_item" class="frm_ajax">
+                                
+                                {% csrf_token %}
+                                {{ add_new_form | crispy }}
+                            
+                                <div id="datasource_customizer"></div>
+                                <input type="submit" class="btn btn-primary btn-sm" value="Save & Continue &raquo;">
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <div class="">
+                <ul class="nav nav-tabs">
+                    <li class="nav-item">
+                        <a class="nav-link active" data-toggle="tab" href="#active">All {{page_title}}</a>
+                    </li>
+                </ul>
+
+                <div class="tab-content">
+                    <div class="tab-pane active " id="active">
+                        <div class="bg-white border border-top-0">
+                            <div class="col-12 pt-3 mb-3">
+                                <table id="records_active" class="table table-striped" style="width:100%"
+                                    data-server-side="true" data-ajax="api/mous/?format=datatables">
+                                    <thead>
+                                        <tr>
+                                            <th data-data="created_on" data-name="created_on">Created On
+                                            </th>
+                                            <th data-data="title" data-name="title">Title
+                                            </th>
+                                            <th data-data="status" data-name="status">
+                                                Status
+                                            </th>
+                                            <th data-data="created_by.last_name" data-name="created_by.last_name">
+                                                Created By
+                                            </th>
+                                            <th data-data="id" data-name='id'>Action</th>
+                                        </tr>
+                                    </thead>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- end tab # records_active -->
+
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</main>
+{% endblock %}

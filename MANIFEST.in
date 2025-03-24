@@ -1,0 +1,13 @@
+include LICENSE
+include README.rst
+recursive-include mou/admin *
+recursive-include mou/models *
+recursive-include mou/urls *
+recursive-include mou/views *
+recursive-include mou/static *
+recursive-include mou/templates *
+recursive-include mou/management *
+recursive-include mou/migrations *
+recursive-include mou/reports *
+recursive-include mou/settings *
+recursive-include mou/staticfiles *

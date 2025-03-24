@@ -1,0 +1,99 @@
+{% extends "cis/base.html" %}
+{%block title %}{{ page_title }}{% endblock %}
+
+{% load templatehelpers %}
+{% load crispy_forms_tags %}
+
+{% block body %}
+
+<div class="container">
+<main>
+    <div class="">
+        <div class="row">
+            
+            <div class="col-12">
+                {{record.mou_intro}}
+            </div>
+
+            {% if messages %}
+                <div class="col-12">
+                    <ul class="messages list-group">
+                        {% for message in messages %}
+                        <li{% if message.tags %} class="list-group-item {{ message.tags }}" {% endif %}>{{ message }}</li>
+                            {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+
+            <script>
+                jQuery(document).ready(function($){
+                    function clear_fields() {
+                        $("#div_id_parent_pay_percentage, #div_id_school_pay_percentage, #div_id_other_pay").hide()
+
+                        toggle_source_of_funds()
+                    }
+
+                    function toggle_source_of_funds() {
+                        var value = $("input[name='source_of_funds']:checked").val()
+
+                        if(value == 'split_pay') {
+                            $("#div_id_parent_pay_percentage, #div_id_school_pay_percentage").show()
+
+                            $("#div_id_other_pay").hide()
+                        } else if(value == 'other'){
+                            $("#div_id_parent_pay_percentage, #div_id_school_pay_percentage").hide()
+
+                            $("#div_id_other_pay").show()
+                        } else {
+                            $("#div_id_parent_pay_percentage, #div_id_school_pay_percentage, #div_id_other_pay").hide()
+                        }
+                    }
+
+                    $(document).on('change', "input[name='source_of_funds']", toggle_source_of_funds)
+
+                    clear_fields()
+                })
+            </script>
+
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h3 class="card-title">Sign MOU</h3>
+                        <hr>
+                        <div class="card-text">
+
+                            {% if record.is_ready_to_be_signed %}
+                                {{form.media}}
+
+                                <form method="POST"
+                                id="frm_mou_sign">
+                                    
+                                    {% csrf_token %}
+                                    {{ form | crispy }}
+                                
+                                    <input type="submit" class="btn btn-primary btn-sm submit" value="Sign and Submit">
+                                </form>
+                            {% else %}
+                                <p class="alert alert-info">The MOU has been signed by you.
+                                    <br><br>
+                                    <a href='{{record.as_pdf_url|safe}}'>Download PDF</a>
+                                </p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8 col-sm-12 mb-4">
+                <div class="card">
+                    <div class="card-body">
+                        {{record.mou_text|safe}}
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+
+</main>
+</div>
+{% endblock %}

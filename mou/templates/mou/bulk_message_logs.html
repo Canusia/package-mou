@@ -1,0 +1,106 @@
+{% extends "cis/logged-base.html" %}
+{%block title %}{{ page_title }}{% endblock %}
+
+{% load templatehelpers %}
+
+{% load crispy_forms_tags %}
+
+{% block body %}
+<main>
+    <div class="">
+        <div class="row">
+            <div class="col-sm-6 col-xs-12">
+                <h1 class="h3 mb-4 text-gray-800">{{ page_title }}&nbsp;
+                </h1>
+            </div>
+        </div>
+
+        <script>
+            jQuery(document).ready(function ($) {
+                
+                var tbl_records_bulk_message_logs = $('#records_bulk_message_logs').DataTable(
+                    {
+                        'orderCellsTop': true,
+                        'fixedHeader': true,
+                        // searching: false,
+                        ajax: 'api/bulk_message_logs/?format=datatables',
+                        serverSide: true,
+                        processing: true,
+                        order: [[0, 'desc']],
+                        dom: 'B<"float-left mt-3 mb-3"l><"float-right mt-3"f><"row clear">rt<"row"<"col-6"i><"col-6 float-right"p>>',
+                                buttons: [
+                                    {
+                                        extend: 'csv', className: 'btn btn-sm btn-primary text-white text-light',
+                                        text: '<i class="fas fa-file-csv text-white"></i>&nbsp;CSV',
+                                        titleAttr: 'Export results to CSV' 
+                                    },
+                                    { 
+                                        extend: 'print', className: 'btn btn-sm btn-primary text-white text-light',
+                                        text: '<i class="fas fa-print text-white"></i>&nbsp;Print',
+                                        titleAttr: 'Print' 
+                                    },
+                                ],
+                        order: [[0, 'desc']],
+                        'columns': [
+                            null,
+                            null,
+                            {
+                                'render': function (data, type, row, meta) {
+                                    return row.bulk_message.title
+                                }
+                            },
+                            null,
+                            {
+                                'render': function (data, type, row, meta) {
+                                    return "<a href='" + row.log_file + "'>Download File</a>"
+                                }
+                            },
+                        ]
+                    }
+                );
+
+                function reload_data() {
+                    tbl_records_bulk_message_logs.ajax.reload(function(){}, false)
+                }
+            });
+        </script>
+        
+        <div class="table-responsive">
+            <div class="">
+                <ul class="nav nav-tabs">
+                    <li class="nav-item">
+                        <a class="nav-link active" data-toggle="tab" href="#active">All {{page_title}}</a>
+                    </li>
+                </ul>
+
+                <div class="tab-content">
+                    <div class="tab-pane active " id="active">
+                        <div class="bg-white border border-top-0">
+                            <div class="col-12 pt-3 mb-3">
+                                <table style="width: 100%;" class="table table-striped" id="records_bulk_message_logs">
+                                    <thead>
+                                        <th data-data="run_started_on" searchable="0" data-name="run_started_on">Started On
+                                        </th>
+                                        <th data-data="run_completed_on" searchable="0" data-name="run_completed_on">Ended On
+                                        </th>
+                                        <th data-data="bulk_message" searchable="0" data-name="bulk_message">Message
+                                        </th>
+                                        <th data-data="summary" searchable="0" data-name="summary">Summary
+                                        </th>
+                                        <th data-data="log_file" searchable="0" data-name="log_file">Download Log
+                                        </th>
+                                    </thead>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- end tab # records_bulk_message_logs -->
+
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</main>
+{% endblock %}
