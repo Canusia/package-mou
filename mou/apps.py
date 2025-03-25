@@ -88,3 +88,6 @@ class DevMOUConfig(AppConfig):
         #     ]
         # },
     ]
+
+    def ready(self):
+        import mou.mou.signals

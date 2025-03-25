@@ -3,9 +3,7 @@ from django.conf import settings
 from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
 
-from mailer import send_mail, send_html_mail
-
-from mou.models import MOUSignature, MOU
+from .models import MOUSignature, MOU
 
 from cis.middleware import current_request
 
@@ -16,6 +14,7 @@ def status_updated(sender, instance, **kwargs):
     previous_status = instance.tracker.previous('status')
     status = instance.status
 
+    print(previous_status, status)
     if previous_status != status:
         if status == 'signed':
             instance.send_notification()

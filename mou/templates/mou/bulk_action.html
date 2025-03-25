@@ -7,6 +7,9 @@
 
 {% block body %}
 
+<script>
+
+</script>
 <div class="card">
     <div class="card-body">
         <h3 class="card-title">{{title}}</h3>
@@ -22,6 +25,8 @@
             </div>
             
             {{form_header}}
+            {{form.media}}
+
             {% if show_form == True %}
             <form action="{%url 'mou_ce:bulk_action' %}" method="post" class="frm_bulk_action" enctype="multipart/form-data">
                 

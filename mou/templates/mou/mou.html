@@ -104,7 +104,7 @@
     jQuery(document).ready(function ($) {
 
         $('form.frm_ajax').submit(function (event) {
-
+            
             var blocked_element = $(this).parent()
             // $(blocked_element).block();
             event.preventDefault()
@@ -177,6 +177,9 @@
 
                             if (response.action == 'reload')
                                 location.reload();
+
+                            if (response.action == 'reload_table')
+                                window.refreshTable()
                         }
                     )
                     $(blocked_element).unblock();
@@ -277,9 +280,8 @@
                                                 </th>
                                                 <th data-data="signator_template.weight" data-name="signator_template.weight">Weight
                                                 </th>
-                                                <th data-data="status" data-name="status">Status
+                                                <th data-data="sexy_status" data-name="status">Status
                                                 </th>
-                                                <th data-data="id" data-name='id'>Action</th>
                                             </tr>
                                         </thead>
                                     </table>
@@ -310,9 +312,9 @@
                                                 </th>
                                                 <th data-data="sexy_role" data-name="sexy_role">Role
                                                 </th>
-                                                <th data-data="complete_extra_form" data-name="complete_extra_form">
+                                                <!-- <th data-data="complete_extra_form" data-name="complete_extra_form">
                                                     Complete Extra Form
-                                                </th>
+                                                </th> -->
                                                 <th data-data="id" data-name='id'>Action</th>
                                             </tr>
                                         </thead>
@@ -322,38 +324,6 @@
                                     </table>
                                     <hr>
 
-                                    <div id="mou_editor">
-                                        {%if signator %}
-                                            <h4>Edit Signator</h4>
-                                        {% else %}
-                                            {% if record.can_edit %}
-                                                <h4>Add New Signator</h4>
-                                            {% endif %}
-                                        {% endif %}
-
-                                        {% if record.can_edit %}
-                                            <div class="clearfix">&nbsp;</div>
-                                            {{form_signator.media}}
-
-                                            <form action="{% url 'mou_ce:mou' record.id %}" method="POST"
-                                        class="frm_ajax" id="frm_mou_signator">
-                                                {% csrf_token %}
-                                                {{ form_signator | crispy }}
-                                                
-                                                {%if signator %}
-                                                <input type="submit" class="btn btn-primary btn-sm" value="Save Signator">
-                                                <a href="{{record.ce_url}}#manage_signators" class="btn btn-sm btn-info">Cancel</a>
-
-                                                <a href="{{signator.mou.ce_url}}?action=delete_signator&signator_id={{signator.id}}#manage_signators" class="btn btn-sm btn-danger float-right">Delete</a>
-                                                {% else %}
-                                                <input type="submit" class="btn btn-primary btn-sm" value="Add New Signator">
-                                                {% endif %}
-
-                                                <!-- <input type="button" class="btn btn-primary btn-sm" value="Save & Preview"> -->
-                                            </form>
-                                        {% endif %}
-
-                                    </div>
                                 </div>
                                 </h5>
                             </div>
@@ -409,6 +379,30 @@
                         }
                         function do_bulk_action(action, dt) {
 
+                            if(action == 'edit_mou_signator') {
+                                let data = {
+                                        'action': action,
+                                        'mou_id': '{{record.id}}',
+                                        'id': dt
+                                    }
+
+                                    $(dt).block()
+                                    url = "{%url 'mou_ce:bulk_action' %}"
+                                    let modal = "modal-bulk_actions"
+
+                                    $.ajax({
+                                        type: "GET",
+                                        url: url,
+                                        data: data,
+                                        success: function(response) {
+                                            
+                                            $("#bulk_modal_content").html(response);
+                                            $("#" + modal).modal('show');
+                                        }
+                                    });
+                                    return;
+                            }
+
                             if(action == 'delete_all') {
                                 if(!confirm('Are you sure you want to delete all recipients?'))
                                     return;
@@ -434,7 +428,7 @@
                                     }
                                 });
                             } else {
-                                if( action == 'add_highschools') {
+                                if( action == 'add_highschools' || action == 'add_signator') {
                                     let data = {
                                         'action': action,
                                         'mou_id': '{{record.id}}'
@@ -526,6 +520,14 @@
                                             do_bulk_action('delete_signator', dt)
                                         }
                                     },
+                                    {
+                                        className: 'btn btn-sm btn-primary text-white text-light hide_on_no_edit',
+                                        text: '<i class="fas fa-plus text-white "></i>&nbsp;Add New',
+                                        titleAttr: 'Add New',
+                                        action: function ( e, dt, node, config ) {
+                                            do_bulk_action('add_signator', dt)
+                                        }
+                                    },
                                             ],
                                     order: [[1, 'asc']],
                                     'columns': [
@@ -542,15 +544,15 @@
                                             'searchable': false,
                                             'orderable': false,
                                         },
-                                        {
-                                            'searchable': false,
-                                            'orderable': false,
-                                        },
+                                        // {
+                                        //     'searchable': false,
+                                        //     'orderable': false,
+                                        // },
                                         {
                                             'searchable': false,
                                             'orderable': false,
                                             'render': function (data, type, row, meta) {
-                                                return "<a class='btn btn-sm btn-primary hide_on_no_edit' href='" + row.mou.ce_url + "?action=edit_signator&signator_id=" + row.id + "#manage_signators'>Edit</a>"
+                                                return "<a class='btn btn-sm btn-primary hide_on_no_edit' onClick=\"do_bulk_action('edit_mou_signator', \'" + row.id + "')\" href='#'>Edit</a>"
                                             }
                                         }
                                     ]
@@ -641,15 +643,15 @@
                                         },
                                         null,
                                         null,
-                                        {
-                                            'searchable': false,
-                                            'orderable': false,
-                                            'render': function (data, type, row, meta) {
-                                                return ''
+                                        // {
+                                        //     'searchable': false,
+                                        //     'orderable': false,
+                                        //     'render': function (data, type, row, meta) {
+                                        //         return ''
 
-                                                return "<a class='btn btn-sm btn-primary hide_on_no_edit' href='" + row.mou.ce_url + "?action=edit_signator&signator_id=" + row.id + "#manage_signators'>Edit</a>"
-                                            }
-                                        }
+                                        //         return "<a class='btn btn-sm btn-primary hide_on_no_edit' href='" + row.mou.ce_url + "?action=edit_signator&signator_id=" + row.id + "#manage_signators'>Edit</a>"
+                                        //     }
+                                        // }
                                     ]
                                 }
                             );

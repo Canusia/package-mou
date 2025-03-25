@@ -59,6 +59,8 @@ class MOUSignatureSerializer(serializers.ModelSerializer):
     signator_template = MOUSignatorSerializer()
     highschool = HighSchoolSerializer()
     signator = CustomUserSerializer()
+
+    sexy_status = serializers.CharField(read_only=True)
     
     class Meta:
         model = MOUSignature

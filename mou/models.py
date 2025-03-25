@@ -27,6 +27,8 @@ from cis.models.highschool import HighSchool
 from cis.models.highschool_administrator import HSPosition, HSAdministratorPosition
 from cis.models.district import DistrictPosition, DistrictAdministratorPosition
 
+from .settings.email_settings import email_settings as configs
+
 class MOU(models.Model):
     """
     Speaker model
@@ -420,6 +422,13 @@ class MOUSignature(models.Model):
     class Meta:
         unique_together = ['highschool', 'signator', 'signator_template']
 
+    @property
+    def sexy_status(self):
+        for k, v in self.STATUS_OPTIONS:
+            if k == self.status:
+                return v
+        return 'N/A'
+    
     def signature_asHTML(self, weight=1):
         
         signature = MOUSignature.objects.filter(
@@ -434,8 +443,7 @@ class MOUSignature(models.Model):
         return signature[0]._signature
     
     def send_notification(self):
-        from mou.settings.email_settings import email_settings as configs
-
+        
         notif_settings = configs.from_db()
 
         if self.status == 'pending':
@@ -512,16 +520,55 @@ class MOUSignature(models.Model):
         return pdf
     
     @property
+    def teacher_list(self):
+        from cis.models.teacher import TeacherCourseCertificate
+        from .settings.email_settings import email_settings as configurator
+
+        configs = configurator.from_db()
+
+        teacher_certs = TeacherCourseCertificate.objects.filter(
+            teacher_highschool__highschool=self.highschool
+        )
+
+        if configs.get('teacher_course_status'):
+            teacher_certs = teacher_certs.filter(
+                status__in=configs.get('teacher_course_status')
+            )
+        
+        template = 'mou/templates/teacher_list.html'
+
+        return render_to_string(template, {
+            'teachers': teacher_certs
+        })
+    
+    @property
+    def class_section_list(self):
+        from cis.models.section import ClassSection
+
+        teacher_certs = TeacherCourseCertificate.objects.filter(
+            teacher_highschool__highschool=self.highschool
+        )
+        
+        template = 'mou/templates/teacher_list.html'
+
+        return render_to_string(template, {
+            'teachers': teacher_certs
+        })
+
+
+    @property
     def mou_text(self):
         # This needs to be updated so all shortcodes are applied
 
         mou = Template(self.signator_template.mou.mou_text)
         context = Context({
-            'poc_information': self.signator_template.mou.poc,
-            'tuition_manager_information': self.signator_template.mou.tuition_manager,
-            'source_of_funds_information': self.signator_template.mou.source_of_funds,
+            # 'poc_information': self.signator_template.mou.poc,
+            # 'tuition_manager_information': self.signator_template.mou.tuition_manager,
+            # 'source_of_funds_information': self.signator_template.mou.source_of_funds,
             'highschool_name': self.highschool.name,
             'highschool_ceeb': self.highschool.code,
+            'teacher_list': self.teacher_list,
+            'academic_year': self.signator_template.mou.academic_year.name,
             'signature_1': self.signature_asHTML(1),
             'signature_2': self.signature_asHTML(2),
             'signature_3': self.signature_asHTML(3),

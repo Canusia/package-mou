@@ -1,0 +1,25 @@
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Course</th>
+            <th>Status</th>
+            <th></th>
+        </tr>
+    </thead>
+
+    <tbody>
+        {% for teacher in teachers %}
+        <tr>
+            <td>{{teacher.teacher_highschool.teacher.user.first_name}} {{teacher.teacher_highschool.teacher.user.last_name}}</td>
+            <td>{{teacher.course.name}}</td>
+            <td>{{teacher.status}}</td>
+            <td>
+                {% if teacher.since %}
+                    {{teacher.since}}
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>

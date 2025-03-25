@@ -209,6 +209,12 @@ def do_bulk_action(request):
     if action == 'delete_signator':
         return delete_signator(request)
     
+    if action == 'add_signator':
+        return add_signator(request)
+    
+    if action == 'edit_mou_signator':
+        return add_signator(request)
+    
     if action == 'delete_signature':
         return delete_signature(request)
     
@@ -298,6 +304,69 @@ def add_highschools(request):
         'show_form': True,
         'form_submit_button_title': 'Save',
         'form_header': mark_safe('<p class="alert alert-info">Select high school(s) from the list to add</p>')
+    }
+    
+    return render(request, template, context)
+
+def add_signator(request):
+    template = 'mou/bulk_action.html'
+
+    from .forms import MOUSignatorForm
+
+    if request.method == 'POST':
+
+        mou_id = request.POST.get('mou_id')
+        id = request.POST.get('id')
+        mou = MOU.objects.get(pk=mou_id)
+
+        if id != '-1':
+            record = MOUSignator.objects.get(pk=id)
+        else:
+            record = None
+
+        form = MOUSignatorForm(record=record, mou_id=mou_id, data=request.POST)
+
+        if form.is_valid():
+            status = form.save(request, mou)
+
+            data = {
+                'status':'success',
+                'message':'Successfully processed request',
+                'action': 'reload_table'
+            }
+            return JsonResponse(data)
+        else:
+            data = {
+                'status':'error',
+                'message':'Please correct the errors and try again.',
+                'errors': form.errors.as_json()
+            }
+        return JsonResponse(data, status=400)
+
+    record = None
+    mou_id = request.GET.get('mou_id')
+    if request.GET.get('id'):
+        record = MOUSignator.objects.get(pk=request.GET.get('id'))
+        
+    form = MOUSignatorForm(record=record, mou_id=mou_id)
+
+    delete_url = ''
+    if record:
+        delete_url = str(reverse_lazy(
+            'mou_ce:mou',
+            kwargs={
+                'record_id': mou_id
+            }
+        )) + f'action=delete_signator&signator_id={record.id}'
+
+    context = {
+        'title': 'Manage Signator',
+        'form': form,
+        'show_form': True,
+        # 'allow_delete': True if record else False,
+        'form_submit_button_title': 'Save',
+        # 'delete_url': mark_safe(delete_url),
+        'form_header': mark_safe('')
     }
     
     return render(request, template, context)
@@ -446,12 +515,13 @@ def mou(request, record_id):
         signator = MOUSignator.objects.get(pk=signator_id)
 
         signator.delete()
-        messages.add_message(
-            request,
-            messages.SUCCESS,
-            """Successfully deleted signator""",
-            'list-group-item-success'
-        )
+        
+        data = {
+            'status':'success',
+            'message':'Successfully processed your rquest.',
+            'action': 'reload_table'
+        }
+        return JsonResponse(data)
 
     if request.method == 'POST':
         action = request.POST.get('action')
@@ -509,7 +579,7 @@ def mou(request, record_id):
                 data = {
                     'status':'success',
                     'message':'Successfully saved MOU Signator.',
-                    'action': 'refresh_signators'
+                    'action': 'reload_table'
                 }
                 return JsonResponse(data)
             else:

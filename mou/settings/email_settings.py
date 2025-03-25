@@ -9,11 +9,19 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit
 
 from cis.validators import validate_html_short_code, validate_email_list
+from cis.models.teacher import TeacherCourseCertificate
 
 from cis.models.crontab import CronTab
 from cis.models.settings import Setting
 
 class SettingForm(forms.Form):
+
+    teacher_course_status = forms.ChoiceField(
+        choices=TeacherCourseCertificate.STATUS_OPTIONS,
+        label='Teacher Course Cert Status',
+        help_text='These status(es) will be included in the teacher_list short code.',
+        widget=forms.Select(attrs={'class': 'col-md-4 col-sm-12'}))
+
     STATUS_OPTIONS = [
         ('', 'Select'),
         ('Yes', 'Yes'),

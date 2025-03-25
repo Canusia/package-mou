@@ -152,6 +152,11 @@ class MOUSignatorDeleteForm(forms.Form):
         widget=forms.CheckboxSelectMultiple
     )
 
+    confirm = forms.BooleanField(
+        required=True,
+        label='I understand that by doing this any signatures added will be removed'
+    )
+
     def __init__(self, ids=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -243,6 +248,10 @@ class MOUSignatureDeleteForm(forms.Form):
 
 class MOUSignatorForm(forms.Form):
     
+    mou_id = forms.CharField(
+        widget=forms.HiddenInput
+    )
+
     action = forms.CharField(
         required=True,
         widget=forms.HiddenInput,
@@ -280,7 +289,10 @@ class MOUSignatorForm(forms.Form):
 
     complete_extra_form = forms.ChoiceField(
         choices=YES_NO_SELECT_OPTIONS,
-        help_text='Will the person in this role complete the additional information form?'
+        required=False,
+        help_text='Will the person in this role complete the additional information form?',
+        widget=forms.HiddenInput,
+        initial='2'
     )
 
     class Media:
@@ -288,7 +300,7 @@ class MOUSignatorForm(forms.Form):
             'js/mou_signator.js'
         ]
 
-    def __init__(self, record, *args, **kwargs):
+    def __init__(self, record, mou_id=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.fields['highschool_admin_role'].choices = list(
@@ -299,6 +311,8 @@ class MOUSignatorForm(forms.Form):
             (pos.id, pos.name) for pos in DistrictPosition.objects.all().order_by('name')
         )
 
+        self.fields['mou_id'].initial = mou_id
+        
         if record:
             self.fields['id'].initial = record.id
 
@@ -358,7 +372,7 @@ class MOUEditorForm(forms.Form):
         ),
         label='MOU Text',
         required=False,
-        help_text='',
+        help_text='Customize with {{signature_1}}, {{signature_2}}, {{highschool_name}}, {{highschool_ceeb}}, {{academic_year}}, {{teacher_list}}',
         validators=[validate_html_short_code]
     )
 
