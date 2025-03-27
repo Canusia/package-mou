@@ -3,8 +3,12 @@ MyCE - MOUs
 
 - Setup
 
-In settings.py, add the app to INSTALLED_APPS as 
-'mou.apps.MOUConfig'
+In settings.py, 
+    add the app to INSTALLED_APPS as 
+        'mou.apps.MOUConfig'
+
+    Add path to STATIC_FILES_DIRS
+        os.path.join(get_package_path("mou"), 'staticfiles'),
 
 In myce.urls.py
 - path('ce/mou/', include('mou.urls.ce')),
