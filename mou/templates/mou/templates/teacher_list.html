@@ -5,6 +5,7 @@
             <th>Course</th>
             <th>Status</th>
             <th></th>
+            <th></th>
         </tr>
     </thead>
 
@@ -17,6 +18,11 @@
             <td>
                 {% if teacher.since %}
                     {{teacher.since}}
+                {% endif %}
+            </td>
+            <td>
+                {% if teacher.expires_on %}
+                    {{teacher.expires_on}}
                 {% endif %}
             </td>
         </tr>

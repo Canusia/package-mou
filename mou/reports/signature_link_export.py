@@ -15,13 +15,13 @@ from cis.utils import (
     export_to_excel, user_has_cis_role,
     user_has_highschool_admin_role, get_field
 )
- 
-from mou.models import MOU, MOUSignature
+
+from ..models import MOU, MOUSignature
 
 class signature_link_export(forms.Form):
     mou = forms.ModelChoiceField(
         queryset=None,
-        title='MOU'
+        label='MOU'
     )
 
     roles = []
@@ -53,7 +53,7 @@ class signature_link_export(forms.Form):
             status='pending'
         )
         
-        file_name = "pending_signatures-" + str(datetime.datetime.now()) + ".csv"
+        file_name = "pending_signatures-" + str(datetime.datetime.now().strftime('%m-%d-%Y')) + ".csv"
         
         fields = {
             'mou_title': 'MOU Title',
@@ -69,7 +69,7 @@ class signature_link_export(forms.Form):
             fields
         )
 
-        path = "reports/" + str(datetime.datetime.now().strftime('%Y%m%d')) + "/" + file_name
+        path = "reports/" + str(datetime.datetime.now().strftime('%Y%m%d')) + f"/{task.id}/" + file_name
         media_storage = PrivateMediaStorage()
 
         path = media_storage.save(path, ContentFile(http_response.content))

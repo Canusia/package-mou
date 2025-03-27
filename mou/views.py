@@ -490,10 +490,6 @@ mou_signature_asPDF.login_required=False
 @csrf_exempt
 @user_passes_test(user_has_cis_role, login_url='/')
 def mou(request, record_id):
-    '''
-     search and index page for staff
-    '''
-    
     menu = draw_menu(cis_menu, 'highschools', 'mous')
     template = 'mou/mou.html'
     
@@ -616,7 +612,7 @@ def mous(request):
     '''
      search and index page for staff
     '''
-    menu = draw_menu(cis_menu, 'highschool', 'mous')
+    menu = draw_menu(cis_menu, 'highschools', 'mous')
 
     template = 'mou/mous.html'
     

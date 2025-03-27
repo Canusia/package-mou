@@ -581,7 +581,7 @@ class MOUSignatureForm(forms.Form):
 
 
     confirm_term = forms.CharField(
-        label='I agree to the terms of the MOU (change me)',
+        label='I have read the terms of the MOU',
         required=True,
         widget=forms.CheckboxInput(
             attrs={

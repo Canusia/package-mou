@@ -61,11 +61,15 @@ class MOUSignatureSerializer(serializers.ModelSerializer):
     signator = CustomUserSerializer()
 
     sexy_status = serializers.CharField(read_only=True)
-    
+    mou_pdf_url = serializers.CharField(read_only=True)
+    is_signed = serializers.BooleanField(read_only=True)
+
     class Meta:
         model = MOUSignature
         fields = '__all__'
 
         datatables_always_serialize = [
-            'id'
+            'id',
+            'mou_pdf_url',
+            'is_signed',
         ]

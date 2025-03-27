@@ -642,7 +642,15 @@
                                             }
                                         },
                                         null,
-                                        null,
+                                        {
+                                            'render': function (data, type, row, meta) {
+                                                let col = row.sexy_status
+
+                                                if(row.is_signed)
+                                                    col += "<br><small><a href='" + row.mou_pdf_url + "'>Download PDF</a>"
+                                                return col
+                                            }
+                                        },
                                         // {
                                         //     'searchable': false,
                                         //     'orderable': false,

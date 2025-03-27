@@ -483,6 +483,10 @@ class MOUSignature(models.Model):
     def is_ready_to_be_signed(self):
         return True if self.status == 'pending' else False
     
+    @property
+    def is_signed(self):
+        return True if self.status == 'signed' else False
+    
     def mark_as_pending(self):
         self.status = 'pending'
         self.save()
@@ -518,6 +522,15 @@ class MOUSignature(models.Model):
 
             return response
         return pdf
+    
+    @property
+    def mou_pdf_url(self):
+        return reverse_lazy(
+            'mou:signature_as_PDF',
+            kwargs={
+                'signature_id': self.id
+            }
+        )
     
     @property
     def teacher_list(self):

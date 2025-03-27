@@ -16,11 +16,12 @@ from cis.models.settings import Setting
 
 class SettingForm(forms.Form):
 
-    teacher_course_status = forms.ChoiceField(
+    teacher_course_status = forms.MultipleChoiceField(
         choices=TeacherCourseCertificate.STATUS_OPTIONS,
         label='Teacher Course Cert Status',
         help_text='These status(es) will be included in the teacher_list short code.',
-        widget=forms.Select(attrs={'class': 'col-md-4 col-sm-12'}))
+        widget=forms.CheckboxSelectMultiple(attrs={'class': 'col-md-4 col-sm-12'})
+    )
 
     STATUS_OPTIONS = [
         ('', 'Select'),

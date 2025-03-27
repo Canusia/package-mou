@@ -17,7 +17,7 @@ from cis.utils import (
     user_has_highschool_admin_role, get_field
 )
  
-from mou.models import MOU, MOUSignature
+from ..models import MOU, MOUSignature
 
 class mou_pdf_export(forms.Form):
     mou = forms.ModelChoiceField(

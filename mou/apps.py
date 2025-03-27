@@ -18,30 +18,30 @@ class MOUConfig(AppConfig):
         },
     ]
     REPORTS = [
-        # {
-        #     'app': 'mou',
-        #     'name': 'signature_link_export',
-        #     'title': 'MOU Signatures Pending Export',
-        #     'description': 'Export pending signatures for the MOU',
-        #     'categories': [
-        #         'Misc.'
-        #     ],
-        #     'available_for': [
-        #         'ce'
-        #     ]
-        # },
-        # {
-        #     'app': 'mou',
-        #     'name': 'mou_pdf_export',
-        #     'title': 'MOU Signatures Export',
-        #     'description': 'Export MOU signatures to PDF',
-        #     'categories': [
-        #         'Misc.'
-        #     ],
-        #     'available_for': [
-        #         'ce'
-        #     ]
-        # },
+        {
+            'app': 'mou',
+            'name': 'signature_link_export',
+            'title': 'MOU Signatures Pending Export',
+            'description': 'Export pending signatures for the MOU',
+            'categories': [
+                'Misc.'
+            ],
+            'available_for': [
+                'ce'
+            ]
+        },
+        {
+            'app': 'mou',
+            'name': 'mou_pdf_export',
+            'title': 'MOU Signatures Export',
+            'description': 'Export MOU signatures to PDF',
+            'categories': [
+                'Misc.'
+            ],
+            'available_for': [
+                'ce'
+            ]
+        },
     ]
 
     def ready(self):
@@ -63,30 +63,30 @@ class DevMOUConfig(AppConfig):
     ]
     
     REPORTS = [
-        # {
-        #     'app': 'mou',
-        #     'name': 'signature_link_export',
-        #     'title': 'MOU Signatures Pending Export',
-        #     'description': 'Export pending signatures for the MOU',
-        #     'categories': [
-        #         'Misc.'
-        #     ],
-        #     'available_for': [
-        #         'ce'
-        #     ]
-        # },
-        # {
-        #     'app': 'mou',
-        #     'name': 'mou_pdf_export',
-        #     'title': 'MOU Signatures Export',
-        #     'description': 'Export MOU signatures to PDF',
-        #     'categories': [
-        #         'Misc.'
-        #     ],
-        #     'available_for': [
-        #         'ce'
-        #     ]
-        # },
+        {
+            'app': 'mou.mou',
+            'name': 'signature_link_export',
+            'title': 'MOU Signatures Pending Export',
+            'description': 'Export pending signatures for the MOU',
+            'categories': [
+                'Misc.'
+            ],
+            'available_for': [
+                'ce'
+            ]
+        },
+        {
+            'app': 'mou.mou',
+            'name': 'mou_pdf_export',
+            'title': 'MOU Signatures Export',
+            'description': 'Export MOU signatures to PDF',
+            'categories': [
+                'Misc.'
+            ],
+            'available_for': [
+                'ce'
+            ]
+        },
     ]
 
     def ready(self):
