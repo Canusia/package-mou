@@ -94,7 +94,7 @@ def mou_add_new(request):
 
             data = {
                 'status':'success',
-                'message':'Successfully started MOU. Click "Okay" to continue.',
+                'message':'Successfully started MOU. Click "Ok" to continue.',
                 'redirect_to': str(record.ce_url),
                 'action': 'redirect_to'
             }
