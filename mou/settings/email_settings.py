@@ -50,7 +50,7 @@ class SettingForm(forms.Form):
         max_length=None,
         widget=forms.Textarea,
         validators=[validate_html_short_code],
-        help_text='Supports HTML. Customize the message with {{highschool_name}}, {{signator_firstname}}, {{signature_lastname}}, {{mou_title}}, {{signature_url}}. <a href="#" class="float-right" onClick="do_bulk_action(\'mou.email_settings\', \'email_message\')" >See Preview</a>',
+        help_text='Supports HTML. Customize the message with {{highschool_name}}, {{role}},{{signator_firstname}}, {{signature_lastname}}, {{mou_title}}, {{signature_url}}. <a href="#" class="float-right" onClick="do_bulk_action(\'mou.email_settings\', \'email_message\')" >See Preview</a>',
         label="Pending Signature Email")
 
     signed_email_subject = forms.CharField(
@@ -62,7 +62,7 @@ class SettingForm(forms.Form):
         max_length=None,
         widget=forms.Textarea,
         validators=[validate_html_short_code],
-        help_text='Supports HTML. Customize the message with {{highschool_name}}, {{signator_firstname}}, {{signature_lastname}}, {{mou_title}}, {{mou_download_link}}. <a href="#" class="float-right" onClick="do_bulk_action(\'mou.email_settings\', \'signed_email_message\')" >See Preview</a>',
+        help_text='Supports HTML. Customize the message with {{highschool_name}}, {{role}},{{signator_firstname}}, {{signature_lastname}}, {{mou_title}}, {{mou_download_link}}. <a href="#" class="float-right" onClick="do_bulk_action(\'mou.email_settings\', \'signed_email_message\')" >See Preview</a>',
         label="Signature Received - Email")
 
     def __init__(self, *args, **kwargs):
@@ -115,6 +115,7 @@ class email_settings(SettingForm):
             'signator_lastname': request.user.last_name,
             'highschool_name': "HS 1",
             'mou_title': "MOU Title",
+            'role': "Role",
             'signature_url': "https://someurl.com",
             'mou_download_link': 'https://downloadurl.com'
         })

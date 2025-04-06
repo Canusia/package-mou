@@ -458,6 +458,7 @@ class MOUSignature(models.Model):
             'signator_firstname': self.signator.first_name,
             'signator_lastname': self.signator.last_name,
             'mou_title': self.mou_title,
+            'role': self.meta.get('role') if self.meta.get('role') else 'N/A',
             'signature_url': self.signature_url,
             'mou_download_link': self.as_pdf_url,
         })

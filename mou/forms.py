@@ -791,7 +791,10 @@ class AddHighSchoolForm(forms.Form):
                             highschool=highschool,
                             signator=admin_positions[0].hsadmin.user,
                             signator_template=signator,
-                            status=''
+                            status='',
+                            meta={
+                                'role': admin_positions[0].position.name
+                            }
                         )
 
                         signature.save()
