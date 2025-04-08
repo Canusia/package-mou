@@ -336,6 +336,7 @@ class MOUSignator(models.Model):
     ROLE_TYPES = [
         ('highschool_admin', "School Administrator"),
         ('district_admin', "District Administrator"),
+        ('college_admin', "College Administrator"),
     ]
     role_type = models.CharField(
         max_length=100,
@@ -369,7 +370,9 @@ class MOUSignator(models.Model):
                 return DistrictPosition.objects.get(pk=self.role).name
             except:
                 return 'District Position Not Found'
-
+        elif self.role_type == 'college_admin':
+            return 'College Administrator'
+            
 class MOUSignature(models.Model):
     """
     Speaker model
@@ -398,6 +401,7 @@ class MOUSignature(models.Model):
         verbose_name='Signator Templates'
     )
 
+    STATUS_PENDING = 'pending'
     STATUS_OPTIONS = [
         ('', 'Not Ready To Sign'),
         ('pending', 'Pending Signature'),
@@ -556,6 +560,57 @@ class MOUSignature(models.Model):
         })
     
     @property
+    def role(self):
+        return self.meta.get('role')
+    
+    @property
+    def choice_teacher_list(self):
+        from cis.models.teacher import TeacherCourseCertificate
+        from .settings.email_settings import email_settings as configurator
+
+        configs = configurator.from_db()
+
+        teacher_certs = TeacherCourseCertificate.objects.filter(
+            teacher_highschool__highschool=self.highschool
+        ).exclude(
+            course__stream__contains='pathways'
+        )
+
+        if configs.get('teacher_course_status'):
+            teacher_certs = teacher_certs.filter(
+                status__in=configs.get('teacher_course_status')
+            )
+        
+        template = 'mou/templates/teacher_list.html'
+
+        return render_to_string(template, {
+            'teachers': teacher_certs
+        })
+    
+    @property
+    def pathways_teacher_list(self):
+        from cis.models.teacher import TeacherCourseCertificate
+        from .settings.email_settings import email_settings as configurator
+
+        configs = configurator.from_db()
+
+        teacher_certs = TeacherCourseCertificate.objects.filter(
+            teacher_highschool__highschool=self.highschool,
+            course__stream__contains='pathways'
+        )
+
+        if configs.get('teacher_course_status'):
+            teacher_certs = teacher_certs.filter(
+                status__in=configs.get('teacher_course_status')
+            )
+        
+        template = 'mou/templates/teacher_list.html'
+
+        return render_to_string(template, {
+            'teachers': teacher_certs
+        })
+    
+    @property
     def class_section_list(self):
         from cis.models.section import ClassSection
 
@@ -582,10 +637,13 @@ class MOUSignature(models.Model):
             'highschool_name': self.highschool.name,
             'highschool_ceeb': self.highschool.code,
             'teacher_list': self.teacher_list,
+            'choice_teacher_list': self.choice_teacher_list,
+            'pathways_teacher_list': self.pathways_teacher_list,
             'academic_year': self.signator_template.mou.academic_year.name,
             'signature_1': self.signature_asHTML(1),
             'signature_2': self.signature_asHTML(2),
             'signature_3': self.signature_asHTML(3),
+            'signature_4': self.signature_asHTML(4),
         })
 
         mou_text = mou.render(context)

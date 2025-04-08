@@ -469,9 +469,13 @@ def send_signature_link(request):
     links = []
     for id in ids:
         signature = MOUSignature.objects.get(pk=id)
-        signature.send_notification()
+        if signature.status == MOUSignature.STATUS_PENDING:
+            signature.send_notification()
 
-        links.append(f'{signature.signator.first_name} {signature.signator.last_name} - ({signature.signator.email})')
+            links.append(f'{signature.signator.first_name} {signature.signator.last_name} - ({signature.signator.email})')
+
+        else:
+            links.append(f'{signature.signator.first_name} {signature.signator.last_name} - No email sent. Please review status and try again')
 
     context = {
         'title': 'MOU Signature Email(s)',

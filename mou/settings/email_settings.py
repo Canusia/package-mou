@@ -10,6 +10,7 @@ from crispy_forms.layout import Submit
 
 from cis.validators import validate_html_short_code, validate_email_list
 from cis.models.teacher import TeacherCourseCertificate
+from cis.models.customuser import CustomUser
 
 from cis.models.crontab import CronTab
 from cis.models.settings import Setting
@@ -34,6 +35,20 @@ class SettingForm(forms.Form):
         choices=STATUS_OPTIONS,
         label='Enabled',
         help_text='',
+        widget=forms.Select(attrs={'class': 'col-md-4 col-sm-12'}))
+
+    college_administrator_1 = forms.ModelChoiceField(
+        queryset=None,
+        label='College Administrator 1',
+        required=False,
+        help_text='This user will be added with a weight of 3 and will be notified',
+        widget=forms.Select(attrs={'class': 'col-md-4 col-sm-12'}))
+    
+    college_administrator_2 = forms.ModelChoiceField(
+        queryset=None,
+        label='College Administrator 2',
+        required=False,
+        help_text='This user will be added with a weight of 4 and will be notified',
         widget=forms.Select(attrs={'class': 'col-md-4 col-sm-12'}))
 
     notify_address = forms.CharField(
@@ -68,6 +83,24 @@ class SettingForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        staff = CustomUser.objects.filter(
+            is_active=True,
+            is_staff=True,
+        ).order_by('last_name')
+
+        self.fields['college_administrator_1'].queryset = staff
+        self.fields['college_administrator_2'].queryset = staff
+
+    def clean_college_administrator_1(self):
+        if self.cleaned_data.get('college_administrator_1'):
+            return self.cleaned_data.get('college_administrator_1').id
+        return None
+    
+    def clean_college_administrator_2(self):
+        if self.cleaned_data.get('college_administrator_2'):
+            return self.cleaned_data.get('college_administrator_2').id
+        return None
+    
     def _to_python(self):
         """
         Return dict of form elements from $_POST

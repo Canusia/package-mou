@@ -280,6 +280,8 @@
                                                 </th>
                                                 <th data-data="signator_template.weight" data-name="signator_template.weight">Weight
                                                 </th>
+                                                <th data-data="role" data-name="role">Role
+                                                </th>
                                                 <th data-data="sexy_status" data-name="status">Status
                                                 </th>
                                             </tr>
@@ -301,6 +303,7 @@
                                 </h5>
 
                                 <div>
+                                    <p class="alert alert-info">Please view the Settings if you need to add internal or college administrators as signators.</p>
                                     <table id="table_signators" class="table table-striped" style="width:100%"
                                     data-server-side="true" data-ajax="{{signators_api}}">
                                         <thead>
@@ -308,8 +311,8 @@
                                                 <th></th>
                                                 <th data-data="weight" data-name="weight">Weight
                                                 </th>
-                                                <th data-data="role_type" data-name="role_type">Role Type
-                                                </th>
+                                                <!-- <th data-data="role_type" data-name="role_type">Role Type
+                                                </th> -->
                                                 <th data-data="sexy_role" data-name="sexy_role">Role
                                                 </th>
                                                 <!-- <th data-data="complete_extra_form" data-name="complete_extra_form">
@@ -539,7 +542,7 @@
                                             }
                                         },
                                         null,
-                                        null,
+                                        // null,
                                         {
                                             'searchable': false,
                                             'orderable': false,
@@ -642,6 +645,10 @@
                                             }
                                         },
                                         null,
+                                        {
+                                            'searchable': false,
+                                            'orderable': false,
+                                        },
                                         {
                                             'render': function (data, type, row, meta) {
                                                 let col = row.sexy_status

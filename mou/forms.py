@@ -1,4 +1,4 @@
-import csv, io, datetime
+import csv, io, datetime, uuid
 from django import forms
 from django.conf import settings
 from django.forms import ValidationError
@@ -265,7 +265,8 @@ class MOUSignatorForm(forms.Form):
 
     role_type = forms.ChoiceField(
         choices=[('', 'Select')] + MOUSignator.ROLE_TYPES,
-        help_text=''
+        help_text='',
+        label='Role Type'
     )
 
     highschool_admin_role = forms.ChoiceField(
@@ -283,8 +284,8 @@ class MOUSignatorForm(forms.Form):
     )
 
     weight = forms.ChoiceField(
-        choices=[('','Select')] + [(i, i)for i in range(1,3)],
-        help_text='Lower weight is required to sign first'
+        choices=[('','Select')] + [(i, i)for i in range(1,5)],
+        help_text='Lower weight is required to sign first. If choosing College Administrator, please select 3 or 4',
     )
 
     complete_extra_form = forms.ChoiceField(
@@ -325,6 +326,18 @@ class MOUSignatorForm(forms.Form):
         else:
             self.fields['id'].initial = -1
 
+    def clean_weight(self):
+        weight = self.cleaned_data.get('weight')
+
+        if weight == '':
+            raise ValidationError('Please select a weight')
+
+        if self.cleaned_data.get('role_type') == 'college_admin':
+            if int(weight) < 3:
+                raise ValidationError('College Administrator must be 3 or 4')
+            
+        return weight
+    
     def save(self, request, mou, commit=True):
         data = self.cleaned_data
 
@@ -340,6 +353,8 @@ class MOUSignatorForm(forms.Form):
             record.role = data.get('highschool_admin_role')
         elif data.get('role_type') == 'district_admin':
             record.role = data.get('district_admin_role')
+        elif data.get('role_type') == 'college_admin':
+            record.role = uuid.uuid4()
 
         record.meta['complete_extra_form'] = data.get('complete_extra_form')
 
@@ -372,7 +387,7 @@ class MOUEditorForm(forms.Form):
         ),
         label='MOU Text',
         required=False,
-        help_text='Customize with {{signature_1}}, {{signature_2}}, {{highschool_name}}, {{highschool_ceeb}}, {{academic_year}}, {{teacher_list}}',
+        help_text='Customize with {{signature_1}}, {{signature_2}}, {{signature_3}}, {{signature_4}}, {{highschool_name}}, {{highschool_ceeb}}, {{academic_year}}, {{teacher_list}}, {{choice_teacher_list}}, {{pathways_teacher_list}}',
         validators=[validate_html_short_code]
     )
 
@@ -758,6 +773,7 @@ class AddHighSchoolForm(forms.Form):
             }
 
             for signator in signators:
+                admin_positions = None
 
                 if signator.role_type == 'highschool_admin':
                     # get the active person 
@@ -766,40 +782,63 @@ class AddHighSchoolForm(forms.Form):
                         highschool=highschool,
                         status__iexact='active'
                     )
-                else:
+                elif signator.role_type == 'district_admin':
                     admin_positions = DistrictAdministratorPosition.objects.filter(
                         position__id=signator.role,
                         district=highschool.district,
                         status__iexact='active'
                     )
+                elif signator.role_type == 'college_admin':
+                    weight = signator.weight
+
+                    # add college administrators if listed in Settings
+                    from .settings.email_settings import email_settings as mou_settings
+                    email_settings = mou_settings.from_db()
+                    if weight == 3:
+                        admin_positions = CustomUser.objects.filter(
+                            id=email_settings.get('college_administrator_1', 1)
+                        )
+                    elif weight == 4:
+                        admin_positions = CustomUser.objects.filter(
+                            id=email_settings.get('college_administrator_2', 1)
+                        )
+                    print(admin_positions, type(admin_positions))
 
                 if not admin_positions:
                     result[highschool.code]['signator'].append({
                         signator.role_type: f'Not found for {signator.weight}'
                     })
                 else:
+                    if signator.role_type in ['highschool_admin', 'district_admin']:
+                        signee = admin_positions[0].hsadmin.user
+                        role = admin_positions[0].position.name
+                    else:
+                        signee = admin_positions[0]
+                        role = 'College Administrator'
+
+                    print(f'Adding {signator.weight} {signator.role_type} {signee} to {highschool.name}')
                     if MOUSignature.objects.filter(
                         highschool=highschool,
-                        signator=admin_positions[0].hsadmin.user,
+                        signator=signee,
                         signator_template=signator
                     ).exists():
                         result[highschool.code]['signator'].append({
-                            signator.role_type: str(admin_positions[0].hsadmin.user) + ' exists'
+                            signator.role_type: str(signee) + ' exists'
                         })
                     else:
                         signature = MOUSignature(
                             highschool=highschool,
-                            signator=admin_positions[0].hsadmin.user,
+                            signator=signee,
                             signator_template=signator,
                             status='',
                             meta={
-                                'role': admin_positions[0].position.name
+                                'role': role,
                             }
                         )
 
                         signature.save()
                         result[highschool.code]['signator'].append({
-                            signator.role_type: str(admin_positions[0].hsadmin.user) + ' added'
+                            signator.role_type: str(signee) + ' added'
                         })
 
         mou.initialize_signature_status()

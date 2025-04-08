@@ -13,6 +13,9 @@ $(function () {
         } else if($(element).val() == 'district_admin') {
             $("#div_id_district_admin_role").show()
             $("#div_id_highschool_admin_role").hide()
+        } else if($(element).val() == 'college_admin') {
+            $("#div_id_highschool_admin_role").hide()
+            $("#div_id_district_admin_role").hide()
         }
     }
   
