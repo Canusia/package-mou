@@ -1,0 +1,33 @@
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Course</th>
+            <th>Instructor</th>
+            <th>Status</th>
+            <th>Since</th>
+            <th>Expires On</th>
+        </tr>
+    </thead>
+
+    <tbody>
+        {% for record in courses %}
+        <tr>
+            <td>{{record.teacher_course.course.title}}</td>
+            <td>{{record.teacher_course.course.name}}</td>
+            <td>{{record.teacher_course.teacher_highschool.teacher.user.first_name}} {{record.teacher_course.teacher_highschool.teacher.user.last_name}}</td>
+            <td>{{record.teacher_course.status}}</td>
+            <td>
+                {% if teacher.since %}
+                    {{teacher.since}}
+                {% endif %}
+            </td>
+            <td>
+                {% if teacher.expires_on %}
+                    {{teacher.expires_on}}
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>

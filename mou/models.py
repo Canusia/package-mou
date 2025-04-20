@@ -588,6 +588,70 @@ class MOUSignature(models.Model):
         })
     
     @property
+    def pathways_course_list(self):
+        from cis.models.future_sections import FutureSection, FutureCourse
+        from cis.models.course import Course
+        from cis.settings.future_sections import future_sections as       configurator
+
+        configs = configurator.from_db()
+        future_sections = FutureCourse.objects.filter(
+            teacher_course__teacher_highschool__highschool=self.highschool,
+            academic_year=self.signator_template.mou.academic_year,
+            teacher_course__course__stream__contains='pathways',
+            section_info__teaching='yes'
+        ).order_by(
+            'teacher_course__course__name'
+        )
+
+        template = 'mou/templates/future_section_courses.html'
+
+        return render_to_string(template, {
+            'courses': future_sections
+        })
+    
+    @property
+    def choice_course_list(self):
+        from cis.models.future_sections import FutureSection, FutureCourse
+        from cis.models.course import Course
+        from cis.settings.future_sections import future_sections as       configurator
+
+        configs = configurator.from_db()
+        future_sections = FutureCourse.objects.filter(
+            teacher_course__teacher_highschool__highschool=self.highschool,
+            academic_year=self.signator_template.mou.academic_year,
+            section_info__teaching='yes'
+        ).exclude(
+            course__stream__contains='pathways'
+        ).order_by(
+            'teacher_course__course__name'
+        )
+
+        template = 'mou/templates/future_section_courses.html'
+
+        return render_to_string(template, {
+            'courses': future_sections
+        })
+    
+    @property
+    def course_list(self):
+        from cis.models.future_sections import FutureSection, FutureCourse
+        from cis.models.course import Course
+        
+        future_sections = FutureCourse.objects.filter(
+            teacher_course__teacher_highschool__highschool=self.highschool,
+            academic_year=self.signator_template.mou.academic_year,
+            section_info__teaching='yes'
+        ).order_by(
+            'teacher_course__course__name'
+        )
+
+        template = 'mou/templates/future_section_courses.html'
+
+        return render_to_string(template, {
+            'courses': future_sections
+        })
+    
+    @property
     def pathways_teacher_list(self):
         from cis.models.teacher import TeacherCourseCertificate
         from .settings.email_settings import email_settings as configurator
@@ -613,6 +677,7 @@ class MOUSignature(models.Model):
     @property
     def class_section_list(self):
         from cis.models.section import ClassSection
+        from cis.models.teacher import TeacherCourseCertificate
 
         teacher_certs = TeacherCourseCertificate.objects.filter(
             teacher_highschool__highschool=self.highschool
@@ -638,6 +703,9 @@ class MOUSignature(models.Model):
             'highschool_ceeb': self.highschool.code,
             'teacher_list': self.teacher_list,
             'choice_teacher_list': self.choice_teacher_list,
+            'pathways_course_list': self.pathways_course_list,
+            'choice_course_list': self.choice_course_list,
+            'course_list': self.course_list,
             'pathways_teacher_list': self.pathways_teacher_list,
             'academic_year': self.signator_template.mou.academic_year.name,
             'signature_1': self.signature_asHTML(1),

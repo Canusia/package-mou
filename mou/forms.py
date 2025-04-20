@@ -387,7 +387,7 @@ class MOUEditorForm(forms.Form):
         ),
         label='MOU Text',
         required=False,
-        help_text='Customize with {{signature_1}}, {{signature_2}}, {{signature_3}}, {{signature_4}}, {{highschool_name}}, {{highschool_ceeb}}, {{academic_year}}, {{teacher_list}}, {{choice_teacher_list}}, {{pathways_teacher_list}}',
+        help_text='Customize with {{signature_1}}, {{signature_2}}, {{signature_3}}, {{signature_4}}, {{highschool_name}}, {{highschool_ceeb}}, {{academic_year}}, {{teacher_list}}, {{choice_teacher_list}}, {{pathways_teacher_list}}, {{pathways_course_list}}, {{choice_course_list}}',
         validators=[validate_html_short_code]
     )
 
