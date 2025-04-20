@@ -621,7 +621,7 @@ class MOUSignature(models.Model):
             academic_year=self.signator_template.mou.academic_year,
             section_info__teaching='yes'
         ).exclude(
-            course__stream__contains='pathways'
+            teacher_course__course__stream__contains='pathways'
         ).order_by(
             'teacher_course__course__name'
         )
