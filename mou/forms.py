@@ -47,6 +47,12 @@ class MOUFinalizeForm(forms.Form):
         initial='finalize'
     )
 
+    academic_year = forms.ModelChoiceField(
+        queryset=None,
+        label='Academic Year',
+        required=False
+    )
+
     status = forms.ChoiceField(
         choices=MOU.STATUS_OPTIONS,
         help_text='Once the MOU is marked as \'Ready\' it will not be possible to edit it',
@@ -93,6 +99,9 @@ class MOUFinalizeForm(forms.Form):
         # else:
         #     self.fields['from_address'].initial = record.meta.get('from_address')
 
+        self.fields['academic_year'].queryset = AcademicYear.objects.all().order_by('-name')
+        self.fields['academic_year'].initial = record.academic_year
+        
         if record.send_on_after:
             self.fields['send_after'].initial = record.send_on_after.strftime('%m/%d/%Y')
 

@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
 from cis.serializers.highschool_admin import CustomUserSerializer
+from cis.serializers.term import AcademicYearSerializer
 from .models import (
     MOU,
     MOUNote,
@@ -17,6 +18,7 @@ class MOUSerializer(serializers.ModelSerializer):
     created_on = serializers.DateTimeField(
         format='%Y-%m-%d %I:%M:%S %p'
     )
+    academic_year = AcademicYearSerializer()
     # send_on_after = serializers.DateTimeField(
     #     format='%Y-%m-%d %I:%M:%S %p'
     # )
