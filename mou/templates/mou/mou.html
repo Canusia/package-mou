@@ -377,9 +377,10 @@
                             var selectedRows = tbl_signatures.rows({ selected: true });
                             selectedRows.deselect();
 
-                            tbl_signators.ajax.reload()
-                            tbl_signatures.ajax.reload()
+                            tbl_signators.ajax.reload(function(){}, false);
+                            tbl_signatures.ajax.reload(function(){}, false);
                         }
+                        
                         function do_bulk_action(action, dt) {
 
                             if(action == 'edit_mou_signator') {

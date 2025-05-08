@@ -2,10 +2,11 @@
     <thead>
         <tr>
             <th>Name</th>
-            <th>Course</th>
+            <th>Section Info</th>
+            <!-- <th>Course</th> -->
             <th>Instructor</th>
             <th>Status</th>
-            <th>Since</th>
+            <!-- <th>Since</th> -->
             <th>Expires On</th>
         </tr>
     </thead>
@@ -14,14 +15,21 @@
         {% for record in courses %}
         <tr>
             <td>{{record.teacher_course.course.title}}</td>
-            <td>{{record.teacher_course.course.name}}</td>
+            <td>
+                {% if record.section_info.sections %}
+                    {% for section in record.section_info.sections %}
+                        {{section.term_name}} <br>
+                    {% endfor %}
+                {% endif %}
+            </td>
+            <!-- <td>{{record.teacher_course.course.name}}</td> -->
             <td>{{record.teacher_course.teacher_highschool.teacher.user.first_name}} {{record.teacher_course.teacher_highschool.teacher.user.last_name}}</td>
             <td>{{record.teacher_course.status}}</td>
-            <td>
+            <!-- <td>
                 {% if teacher.since %}
                     {{teacher.since}}
                 {% endif %}
-            </td>
+            </td> -->
             <td>
                 {% if teacher.expires_on %}
                     {{teacher.expires_on}}
