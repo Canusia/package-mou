@@ -28,8 +28,8 @@ from cis.models.term import AcademicYear
 from cis.models.highschool_administrator import HSPosition
 from cis.models.district import DistrictPosition
 
-from announcement.models.announcement import Announcement, BulkMessage
-from announcement.apps import BMAILER_DS
+# from announcement.models.announcement import Announcement, BulkMessage
+# from announcement.apps import BMAILER_DS
 
 
 class MOUFinalizeForm(forms.Form):
