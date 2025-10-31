@@ -621,7 +621,30 @@ class MOUSignature(models.Model):
             academic_year=self.signator_template.mou.academic_year,
             section_info__teaching='yes'
         ).exclude(
-            teacher_course__course__stream__contains='pathways'
+            Q(teacher_course__course__stream__contains='pathways') | 
+            Q(teacher_course__course__stream__contains='facilitator')
+        ).order_by(
+            'teacher_course__course__name'
+        )
+
+        template = 'mou/templates/future_section_courses.html'
+
+        return render_to_string(template, {
+            'courses': future_sections
+        })
+    
+    @property
+    def facilitator_course_list(self):
+        from cis.models.future_sections import FutureSection, FutureCourse
+        from cis.models.course import Course
+        from cis.settings.future_sections import future_sections as       configurator
+
+        configs = configurator.from_db()
+        future_sections = FutureCourse.objects.filter(
+            teacher_course__teacher_highschool__highschool=self.highschool,
+            academic_year=self.signator_template.mou.academic_year,
+            teacher_course__course__stream__contains='facilitator',
+            section_info__teaching='yes'
         ).order_by(
             'teacher_course__course__name'
         )
