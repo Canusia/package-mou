@@ -597,10 +597,10 @@ class MOUSignature(models.Model):
         future_sections = FutureCourse.objects.filter(
             teacher_course__teacher_highschool__highschool=self.highschool,
             academic_year=self.signator_template.mou.academic_year,
-            teacher_course__course__stream__contains='pathways',
+            teacher_course__course__stream__contains__in=['pathways', 'dual_enrollment'],
             section_info__teaching='yes'
         ).order_by(
-            'teacher_course__course__name'
+            'teacher_course__course__title'
         )
 
         template = 'mou/templates/future_section_courses.html'
@@ -622,7 +622,7 @@ class MOUSignature(models.Model):
             section_info__teaching='yes',
             teacher_course__course__stream__contains='cccl'
         ).order_by(
-            'teacher_course__course__name'
+            'teacher_course__course__title'
         )
 
         template = 'mou/templates/future_section_courses.html'
@@ -641,10 +641,10 @@ class MOUSignature(models.Model):
         future_sections = FutureCourse.objects.filter(
             teacher_course__teacher_highschool__highschool=self.highschool,
             academic_year=self.signator_template.mou.academic_year,
-            teacher_course__course__stream__contains='dual_enrollment',
+            teacher_course__course__stream__contains__in=['pathways', 'dual_enrollment'],
             section_info__teaching='yes'
         ).order_by(
-            'teacher_course__course__name'
+            'teacher_course__course__title'
         )
 
         template = 'mou/templates/future_section_courses.html'
