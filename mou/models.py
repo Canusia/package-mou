@@ -571,9 +571,8 @@ class MOUSignature(models.Model):
         configs = configurator.from_db()
 
         teacher_certs = TeacherCourseCertificate.objects.filter(
-            teacher_highschool__highschool=self.highschool
-        ).exclude(
-            course__stream__contains='pathways'
+            teacher_highschool__highschool=self.highschool,
+            course__stream__contains='cccl'
         )
 
         if configs.get('teacher_course_status'):
@@ -597,7 +596,7 @@ class MOUSignature(models.Model):
         future_sections = FutureCourse.objects.filter(
             teacher_course__teacher_highschool__highschool=self.highschool,
             academic_year=self.signator_template.mou.academic_year,
-            teacher_course__course__stream__contains__in=['pathways', 'dual_enrollment'],
+            teacher_course__course__stream__contains='dual_enrollment',
             section_info__teaching='yes'
         ).order_by(
             'teacher_course__course__title'
@@ -641,7 +640,7 @@ class MOUSignature(models.Model):
         future_sections = FutureCourse.objects.filter(
             teacher_course__teacher_highschool__highschool=self.highschool,
             academic_year=self.signator_template.mou.academic_year,
-            teacher_course__course__stream__contains__in=['pathways', 'dual_enrollment'],
+            teacher_course__course__stream__contains='dual_enrollment',
             section_info__teaching='yes'
         ).order_by(
             'teacher_course__course__title'
@@ -681,7 +680,7 @@ class MOUSignature(models.Model):
 
         teacher_certs = TeacherCourseCertificate.objects.filter(
             teacher_highschool__highschool=self.highschool,
-            course__stream__contains='pathways'
+            course__stream__contains='dual_enrollment'
         )
 
         if configs.get('teacher_course_status'):
