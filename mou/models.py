@@ -596,6 +596,52 @@ class MOUSignature(models.Model):
         future_sections = FutureCourse.objects.filter(
             teacher_course__teacher_highschool__highschool=self.highschool,
             academic_year=self.signator_template.mou.academic_year,
+            teacher_course__course__stream__contains='pathways',
+            section_info__teaching='yes'
+        ).order_by(
+            'teacher_course__course__title'
+        )
+
+        template = 'mou/templates/future_section_courses.html'
+
+        return render_to_string(template, {
+            'courses': future_sections
+        })
+    
+    @property
+    def pathways_teacher_list(self):
+        from cis.models.teacher import TeacherCourseCertificate
+        from .settings.email_settings import email_settings as configurator
+
+        configs = configurator.from_db()
+
+        teacher_certs = TeacherCourseCertificate.objects.filter(
+            teacher_highschool__highschool=self.highschool,
+            course__stream__contains='pathways'
+        )
+
+        if configs.get('teacher_course_status'):
+            teacher_certs = teacher_certs.filter(
+                status__in=configs.get('teacher_course_status')
+            )
+        
+        template = 'mou/templates/teacher_list.html'
+
+        return render_to_string(template, {
+            'teachers': teacher_certs
+        })
+    
+    
+    @property
+    def dual_enrollment_course_list(self):
+        from cis.models.future_sections import FutureSection, FutureCourse
+        from cis.models.course import Course
+        from cis.settings.future_sections import future_sections as       configurator
+
+        configs = configurator.from_db()
+        future_sections = FutureCourse.objects.filter(
+            teacher_course__teacher_highschool__highschool=self.highschool,
+            academic_year=self.signator_template.mou.academic_year,
             teacher_course__course__stream__contains='dual_enrollment',
             section_info__teaching='yes'
         ).order_by(
@@ -609,6 +655,29 @@ class MOUSignature(models.Model):
         })
     
     @property
+    def dual_enrollment_teacher_list(self):
+        from cis.models.teacher import TeacherCourseCertificate
+        from .settings.email_settings import email_settings as configurator
+
+        configs = configurator.from_db()
+
+        teacher_certs = TeacherCourseCertificate.objects.filter(
+            teacher_highschool__highschool=self.highschool,
+            course__stream__contains='dual_enrollment'
+        )
+
+        if configs.get('teacher_course_status'):
+            teacher_certs = teacher_certs.filter(
+                status__in=configs.get('teacher_course_status')
+            )
+        
+        template = 'mou/templates/teacher_list.html'
+
+        return render_to_string(template, {
+            'teachers': teacher_certs
+        })
+    
+    @property
     def choice_course_list(self):
         from cis.models.future_sections import FutureSection, FutureCourse
         from cis.models.course import Course
@@ -619,7 +688,7 @@ class MOUSignature(models.Model):
             teacher_course__teacher_highschool__highschool=self.highschool,
             academic_year=self.signator_template.mou.academic_year,
             section_info__teaching='yes',
-            teacher_course__course__stream__contains='cccl'
+            teacher_course__course__stream__contains='pathways'
         ).order_by(
             'teacher_course__course__title'
         )
@@ -671,28 +740,6 @@ class MOUSignature(models.Model):
             'courses': future_sections
         })
     
-    @property
-    def pathways_teacher_list(self):
-        from cis.models.teacher import TeacherCourseCertificate
-        from .settings.email_settings import email_settings as configurator
-
-        configs = configurator.from_db()
-
-        teacher_certs = TeacherCourseCertificate.objects.filter(
-            teacher_highschool__highschool=self.highschool,
-            course__stream__contains='dual_enrollment'
-        )
-
-        if configs.get('teacher_course_status'):
-            teacher_certs = teacher_certs.filter(
-                status__in=configs.get('teacher_course_status')
-            )
-        
-        template = 'mou/templates/teacher_list.html'
-
-        return render_to_string(template, {
-            'teachers': teacher_certs
-        })
     
     @property
     def class_section_list(self):
@@ -722,11 +769,17 @@ class MOUSignature(models.Model):
             'highschool_name': self.highschool.name,
             'highschool_ceeb': self.highschool.code,
             'teacher_list': self.teacher_list,
-            'choice_teacher_list': self.choice_teacher_list,
-            'pathways_course_list': self.pathways_course_list,
-            'choice_course_list': self.choice_course_list,
-            'course_list': self.course_list,
+            # 'choice_teacher_list': self.choice_teacher_list,
+
             'pathways_teacher_list': self.pathways_teacher_list,
+            'pathways_course_list': self.pathways_course_list,
+
+            'dual_enrollment_course_list': self.dual_enrollment_course_list,
+            'dual_enrollment_teacher_list': self.dual_enrollment_teacher_list,
+
+            # 'choice_course_list': self.choice_course_list,
+            'course_list': self.course_list,
+            'dual_enrollment_teacher_list': self.dual_enrollment_teacher_list,
             'academic_year': self.signator_template.mou.academic_year.name,
             'signature_1': self.signature_asHTML(1),
             'signature_2': self.signature_asHTML(2),
