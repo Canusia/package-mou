@@ -1,0 +1,14 @@
+{% load static %}
+
+<table id="{{ config.table_id }}" class="table table-striped" style="width:100%">
+  <thead>
+    <tr>
+      {% for col in config.column_headers %}{{ col|safe }}{% endfor %}
+    </tr>
+  </thead>
+</table>
+
+<script src="{% static 'js/signatures_table.js' %}"></script>
+<script>
+  initSignaturesTable('#{{ config.table_id }}', {{ config.opts_json|safe }});
+</script>
