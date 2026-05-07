@@ -173,6 +173,9 @@
                     <li class="nav-item">
                         <a class="nav-link active" data-toggle="tab" href="#active">All {{page_title}}</a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-toggle="tab" href="#by_academic_year">By Academic Year</a>
+                    </li>
                 </ul>
 
                 <div class="tab-content">
@@ -203,6 +206,32 @@
                         </div>
                     </div>
                     <!-- end tab # records_active -->
+
+                    <div class="tab-pane" id="by_academic_year">
+                        <div class="bg-white border border-top-0 p-3">
+                            <div class="form-inline mb-3">
+                                <label for="signatures_year_filter" class="mr-2 mb-0">Academic Year:</label>
+                                <select id="signatures_year_filter" class="form-control form-control-sm">
+                                    {% for ay in academic_years %}
+                                    <option value="{{ ay.id }}"{% if ay.id == initial_academic_year_id %} selected{% endif %}>{{ ay.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            {% include 'mou/_signatures_table.html' with config=signatures_table %}
+                        </div>
+                    </div>
+
+                    <script>
+                      jQuery(document).ready(function ($) {
+                        $('#signatures_year_filter').on('change', function () {
+                          var ayId = $(this).val();
+                          var newUrl = '/ce/highschools/mous/api/mou_signatures/?format=datatables&academic_year_id=' + encodeURIComponent(ayId);
+                          var dt = $('#tbl_mou_signatures_by_year').DataTable();
+                          dt.ajax.url(newUrl).load();
+                        });
+                      });
+                    </script>
 
                 </div>
             </div>

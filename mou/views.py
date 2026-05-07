@@ -629,7 +629,28 @@ def mous(request):
     menu = draw_menu(cis_menu, 'highschools', 'mous')
 
     template = 'mou/mous.html'
-    
+
+    try:
+        from mou.mou.services.signatures_table import build_config as build_signatures_table_config
+    except ImportError:
+        from mou.services.signatures_table import build_config as build_signatures_table_config
+    from cis.models.term import AcademicYear
+
+    academic_years = list(
+        AcademicYear.objects.filter(
+            id__in=MOU.objects.values_list('academic_year_id', flat=True)
+        ).order_by('-name')
+    )
+    initial_academic_year_id = academic_years[0].id if academic_years else ''
+
+    signatures_table = build_signatures_table_config(
+        variant='by_academic_year',
+        api_url=(
+            f'/ce/highschools/mous/api/mou_signatures/?format=datatables'
+            f'&academic_year_id={initial_academic_year_id}'
+        ),
+    )
+
     return render(
         request,
         template, {
@@ -637,6 +658,9 @@ def mous(request):
             'urls': {
             },
             'menu': menu,
-            'add_new_form': MOUInitForm(request)
+            'add_new_form': MOUInitForm(request),
+            'academic_years': academic_years,
+            'initial_academic_year_id': initial_academic_year_id,
+            'signatures_table': signatures_table,
             }
         )
