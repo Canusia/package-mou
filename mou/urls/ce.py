@@ -19,9 +19,9 @@ from ..views import (
 app_name = 'mou_ce'
 
 router = routers.DefaultRouter()
-router.register('mous', MOUViewSet, basename=app_name)
-router.register('mou_signators', MOUSignatorViewSet, basename=app_name)
-router.register('mou_signatures', MOUSignatureViewSet, basename=app_name)
+router.register('mous', MOUViewSet, basename=f'{app_name}_mous')
+router.register('mou_signators', MOUSignatorViewSet, basename=f'{app_name}_signators')
+router.register('mou_signatures', MOUSignatureViewSet, basename=f'{app_name}_signatures')
 
 urlpatterns = [
     path('', mous, name='all'),
