@@ -72,9 +72,14 @@ class MOUSignatureViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         records = MOUSignature.objects.all()
 
-        if self.request.GET.get('mou_id'):
+        mou_id = self.request.GET.get('mou_id')
+        if mou_id:
+            records = records.filter(signator_template__mou__id=mou_id)
+
+        academic_year_id = self.request.GET.get('academic_year_id')
+        if academic_year_id:
             records = records.filter(
-                signator_template__mou__id=self.request.GET.get('mou_id')
+                signator_template__mou__academic_year__id=academic_year_id
             )
         return records
 
@@ -270,9 +275,8 @@ def manage_signature_status(request):
     return render(request, template, context)
 
 def add_highschools(request):
-    template = 'mou/bulk_action.html'
-
     from .forms import AddHighSchoolForm
+    from cis.models.highschool import HighSchool
 
     if request.method == 'POST':
 
@@ -297,16 +301,22 @@ def add_highschools(request):
         return JsonResponse(data, status=400)
 
     mou_id = request.GET.get('mou_id')
-    form = AddHighSchoolForm(mou_id)
+
+    highschools = HighSchool.objects.select_related('district').order_by('name')
+
     context = {
         'title': 'Add High School(s)',
-        'form': form,
-        'show_form': True,
+        'mou_id': mou_id,
+        'highschools': highschools,
         'form_submit_button_title': 'Save',
-        'form_header': mark_safe('<p class="alert alert-info">Select high school(s) from the list to add</p>')
+        'form_header': mark_safe(
+            '<p class="alert alert-info mb-3">Filter by name, CEEB, district, or status. '
+            'Use the header checkbox to select all currently visible rows; selections '
+            'persist across pages.</p>'
+        ),
     }
-    
-    return render(request, template, context)
+
+    return render(request, 'mou/add_highschools.html', context)
 
 def add_signator(request):
     template = 'mou/bulk_action.html'
