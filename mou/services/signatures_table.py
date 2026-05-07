@@ -17,7 +17,7 @@ COLUMN_HEADER_HTML = {
     'signator':      '<th data-data="signator.last_name" data-name="signator.last_name">Signator</th>',
     'role':          '<th data-data="role" data-name="role">Role</th>',
     'status':        '<th data-data="status" data-name="status">Status</th>',
-    'updated_on':    '<th data-data="updated_on" data-name="updated_on">Last Updated</th>',
+    'created_on':    '<th data-data="created_on" data-name="created_on">Created On</th>',
     'actions':       '<th data-data="id" data-name="id"><span class="sr-only">Actions</span></th>',
 }
 
@@ -26,9 +26,9 @@ _PROFILES = {
     'by_academic_year': {
         'table_id':     'tbl_mou_signatures_by_year',
         'columns':      ['select', 'mou_title', 'academic_year', 'highschool',
-                         'signator', 'role', 'status', 'updated_on', 'actions'],
+                         'signator', 'role', 'status', 'created_on', 'actions'],
         'action_scope': 'by_academic_year',
-        'default_order': [7, 'desc'],   # updated_on
+        'default_order': [7, 'desc'],   # created_on
     },
 }
 

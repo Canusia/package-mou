@@ -76,11 +76,19 @@
           if (s === 'signed')  cls = 'badge-success';
           if (s === 'pending') cls = 'badge-warning';
           if (s === 'declined' || s === 'failed') cls = 'badge-danger';
-          return '<span class="badge ' + cls + '">' + pretty + '</span>';
+          var html = '<span class="badge ' + cls + '">' + pretty + '</span>';
+          // For signed rows, expose a PDF download link directly under the badge.
+          // mou_pdf_url + is_signed are emitted by MOUSignatureSerializer
+          // (datatables_always_serialize).
+          if (row.is_signed && row.mou_pdf_url) {
+            html += '<br><a href="' + row.mou_pdf_url + '" target="_blank" class="small">' +
+              '<i class="fas fa-file-pdf"></i>&nbsp;Download PDF</a>';
+          }
+          return html;
         },
       },
-      updated_on: {
-        render: function (_d, _t, row) { return row.updated_on || row.modified_on || ''; },
+      created_on: {
+        render: function (_d, _t, row) { return row.created_on || ''; },
       },
       actions: {
         searchable: false,

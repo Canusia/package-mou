@@ -1,3 +1,4 @@
+import re
 import uuid, datetime
 
 from django.http import HttpResponse
@@ -657,7 +658,7 @@ class MOUSignature(models.Model):
     def course_list(self):
         from cis.models.future_sections import FutureSection, FutureCourse
         from cis.models.course import Course
-        
+
         future_sections = FutureCourse.objects.filter(
             teacher_course__teacher_highschool__highschool=self.highschool,
             academic_year=self.signator_template.mou.academic_year,
@@ -668,6 +669,36 @@ class MOUSignature(models.Model):
 
         template = 'mou/templates/future_section_courses.html'
 
+        return render_to_string(template, {
+            'courses': future_sections
+        })
+
+    @property
+    def future_course_list(self):
+        import importlib.util
+        if importlib.util.find_spec('future_sections.future_sections'):
+            from future_sections.future_sections.models import FutureCourse
+        else:
+            from future_sections.models import FutureCourse
+        from .settings.email_settings import email_settings
+
+        future_sections = FutureCourse.objects.filter(
+            teacher_course__teacher_highschool__highschool=self.highschool,
+            academic_year=self.signator_template.mou.academic_year
+        ).order_by(
+            'teacher_course__course__name'
+        )
+        print(future_sections.query)
+        print(future_sections.count())
+
+        # If the admin configured a custom HTML template for this shortcode,
+        # render it as an inline Django template; otherwise fall back to the
+        # bundled file.
+        custom_html = (email_settings.from_db().get('future_course_list_template') or '').strip()
+        if custom_html:
+            return Template(custom_html).render(Context({'courses': future_sections}))
+
+        template = 'mou/templates/future_section_courses.html'
         return render_to_string(template, {
             'courses': future_sections
         })
@@ -711,32 +742,92 @@ class MOUSignature(models.Model):
         })
 
 
+    # {{role_<attr>_<Position_Name_With_Underscores>}}
+    # <attr>      ∈ {first_name, last_name, email, name}  (name = "First Last")
+    # underscores in <Position_Name> are translated to spaces for the lookup
+    # (case-insensitive on HSPosition.name). Empty string if no admin holds that
+    # position at this MOU's highschool.
+    # Disambiguation: attr is bounded by the alternation, so the rest of the
+    # token (after `role_<attr>_`) is the position name even though it contains
+    # underscores. Examples:
+    #   {{role_first_name_Academic_Principal}}  -> first name of the "Academic Principal"
+    #   {{role_last_name_Dean_of_Guidance}}     -> last name of the "Dean of Guidance"
+    #   {{role_email_Principal}}                 -> email of the "Principal"
+    _ROLE_SHORTCODE_RE = re.compile(
+        r'\{\{\s*role_(first_name|last_name|email|name)_([A-Za-z0-9_]+?)\s*\}\}'
+    )
+
+    def _resolve_role_shortcode(self, attr, position_token):
+        from cis.models.highschool_administrator import HSAdministratorPosition
+
+        position_name = position_token.replace('_', ' ')
+        admin_position = HSAdministratorPosition.objects.filter(
+            highschool=self.highschool,
+            position__name__iexact=position_name,
+        ).select_related('hsadmin__user').first()
+        if not admin_position:
+            return ''
+
+        user = admin_position.hsadmin.user
+        if attr == 'name':
+            return f'{user.first_name} {user.last_name}'.strip()
+        return getattr(user, attr, '') or ''
+
+    def _render_role_shortcodes(self, text):
+        return self._ROLE_SHORTCODE_RE.sub(
+            lambda m: self._resolve_role_shortcode(m.group(1), m.group(2)),
+            text,
+        )
+
     @property
     def mou_text(self):
-        # This needs to be updated so all shortcodes are applied
+        from .settings.email_settings import email_settings, AVAILABLE_SHORTCODES
 
-        mou = Template(self.signator_template.mou.mou_text)
+        cfg = email_settings.from_db()
+        configured = cfg.get('available_shortcodes')
+        if configured is None:
+            # Setting not yet saved → backwards-compat: all shortcodes allowed.
+            allowed = {k for k, _ in AVAILABLE_SHORTCODES}
+        else:
+            allowed = set(configured)
+
+        choice_keys = {k for k, _ in AVAILABLE_SHORTCODES}
+
+        raw_text = self.signator_template.mou.mou_text
+        # role_* shortcodes are preprocessed before Django Template rendering
+        # because Django can't resolve dynamic variable names. If 'role_lookup'
+        # is disabled, leave the {{role_*}} tokens untouched — Django will
+        # render them as empty strings since they're not in the context.
+        if 'role_lookup' in allowed:
+            raw_text = self._render_role_shortcodes(raw_text)
+
+        # Full set of shortcode values. Anything NOT in `choice_keys` (e.g. the
+        # historical `course_list`) is always rendered with its real value to
+        # preserve backwards compatibility with existing MOU templates. Keys in
+        # `choice_keys` but absent from `allowed` are forced to empty string.
+        full_values = {
+            'signature_1':             self.signature_asHTML(1),
+            'signature_2':             self.signature_asHTML(2),
+            'signature_3':             self.signature_asHTML(3),
+            'signature_4':             self.signature_asHTML(4),
+            'highschool_name':         self.highschool.name,
+            'highschool_ceeb':         self.highschool.code,
+            'academic_year':           self.signator_template.mou.academic_year.name,
+            'teacher_list':            self.teacher_list,
+            'choice_teacher_list':     self.choice_teacher_list,
+            'pathways_teacher_list':   self.pathways_teacher_list,
+            'pathways_course_list':    self.pathways_course_list,
+            'choice_course_list':      self.choice_course_list,
+            'facilitator_course_list': self.facilitator_course_list,
+            'course_list':             self.course_list,
+            'future_course_list':      self.future_course_list,
+        }
         context = Context({
-            # 'poc_information': self.signator_template.mou.poc,
-            # 'tuition_manager_information': self.signator_template.mou.tuition_manager,
-            # 'source_of_funds_information': self.signator_template.mou.source_of_funds,
-            'highschool_name': self.highschool.name,
-            'highschool_ceeb': self.highschool.code,
-            'teacher_list': self.teacher_list,
-            'choice_teacher_list': self.choice_teacher_list,
-            'pathways_course_list': self.pathways_course_list,
-            'choice_course_list': self.choice_course_list,
-            'course_list': self.course_list,
-            'pathways_teacher_list': self.pathways_teacher_list,
-            'academic_year': self.signator_template.mou.academic_year.name,
-            'signature_1': self.signature_asHTML(1),
-            'signature_2': self.signature_asHTML(2),
-            'signature_3': self.signature_asHTML(3),
-            'signature_4': self.signature_asHTML(4),
+            k: ('' if (k in choice_keys and k not in allowed) else v)
+            for k, v in full_values.items()
         })
 
-        mou_text = mou.render(context)
-        return mou_text
+        return Template(raw_text).render(context)
     
     @property
     def mou_title(self):

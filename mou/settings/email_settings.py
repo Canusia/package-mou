@@ -15,6 +15,30 @@ from cis.models.customuser import CustomUser
 from cis.models.crontab import CronTab
 from cis.models.settings import Setting
 
+
+# Single source of truth for which shortcodes the MOU text supports.
+# Read by both the SettingForm field below (for the admin UI) and by
+# MOUSignature.mou_text (for runtime gating). The 'role_lookup' choice covers
+# the entire {{role_<attr>_<Position>}} family (any attr, any position).
+AVAILABLE_SHORTCODES = [
+    ('signature_1',             '{{signature_1}} — Signature box (weight 1)'),
+    ('signature_2',             '{{signature_2}} — Signature box (weight 2)'),
+    ('signature_3',             '{{signature_3}} — Signature box (weight 3)'),
+    ('signature_4',             '{{signature_4}} — Signature box (weight 4)'),
+    ('highschool_name',         '{{highschool_name}} — High school name'),
+    ('highschool_ceeb',         '{{highschool_ceeb}} — High school CEEB code'),
+    ('academic_year',           '{{academic_year}} — Academic year'),
+    ('teacher_list',            '{{teacher_list}} — Certified teachers list'),
+    ('choice_teacher_list',     '{{choice_teacher_list}} — Choice (CCCL) teachers list'),
+    ('pathways_teacher_list',   '{{pathways_teacher_list}} — Pathways teachers list'),
+    ('pathways_course_list',    '{{pathways_course_list}} — Pathways courses list'),
+    ('choice_course_list',      '{{choice_course_list}} — Choice (CCCL) courses list'),
+    ('facilitator_course_list', '{{facilitator_course_list}} — Facilitator courses list'),
+    ('future_course_list',      '{{future_course_list}} — Submitted future courses list'),
+    ('role_lookup',             '{{role_<attr>_<Position>}} — Per-position admin lookup (any attribute, any position)'),
+]
+
+
 class SettingForm(forms.Form):
 
     teacher_course_status = forms.MultipleChoiceField(
@@ -24,18 +48,31 @@ class SettingForm(forms.Form):
         widget=forms.CheckboxSelectMultiple(attrs={'class': 'col-md-4 col-sm-12'})
     )
 
-    STATUS_OPTIONS = [
-        ('', 'Select'),
-        ('Yes', 'Yes'),
-        ('No', 'No'),
-        ('Debug', 'Debug')
-    ]
+    available_shortcodes = forms.MultipleChoiceField(
+        choices=AVAILABLE_SHORTCODES,
+        label='Available Shortcodes',
+        help_text=(
+            'Shortcodes selected here are substituted in MOU text at render time. '
+            'Unselected shortcodes are replaced with an empty string. Leave all '
+            'selected to keep current behavior.'
+        ),
+        required=False,
+        widget=forms.CheckboxSelectMultiple(attrs={'class': 'col-md-12'}),
+    )
 
-    is_active = forms.ChoiceField(
-        choices=STATUS_OPTIONS,
-        label='Enabled',
-        help_text='',
-        widget=forms.Select(attrs={'class': 'col-md-4 col-sm-12'}))
+    future_course_list_template = forms.CharField(
+        max_length=None,
+        widget=forms.Textarea(attrs={'rows': 12, 'class': 'col-md-12'}),
+        validators=[validate_html_short_code],
+        required=False,
+        help_text=(
+            'Django-template HTML used by the {{future_course_list}} shortcode. '
+            'The variable <code>courses</code> is a queryset of FutureCourse '
+            'records (highschool + academic year, filtered to submitted). Leave '
+            'blank to fall back to the bundled <code>mou/templates/future_section_courses.html</code>.'
+        ),
+        label='{{future_course_list}} HTML Template',
+    )
 
     college_administrator_1 = forms.ModelChoiceField(
         queryset=None,
@@ -49,6 +86,19 @@ class SettingForm(forms.Form):
         label='College Administrator 2',
         required=False,
         help_text='This user will be added with a weight of 4 and will be notified',
+        widget=forms.Select(attrs={'class': 'col-md-4 col-sm-12'}))
+
+    STATUS_OPTIONS = [
+        ('', 'Select'),
+        ('Yes', 'Yes'),
+        ('No', 'No'),
+        ('Debug', 'Debug')
+    ]
+
+    is_active = forms.ChoiceField(
+        choices=STATUS_OPTIONS,
+        label='Enabled',
+        help_text='',
         widget=forms.Select(attrs={'class': 'col-md-4 col-sm-12'}))
 
     notify_address = forms.CharField(
@@ -174,6 +224,7 @@ class email_settings(SettingForm):
     def install(self):
         defaults = {
             'is_active': "Debug",
+            'available_shortcodes': [k for k, _ in AVAILABLE_SHORTCODES],
         }
 
         try:

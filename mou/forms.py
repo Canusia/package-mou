@@ -59,13 +59,6 @@ class MOUFinalizeForm(forms.Form):
         required=True
     )
 
-    cron = forms.CharField(
-        max_length=20,
-        help_text='Min Hr Day Month WeekDay. Eg: 10 11 * * 1-3 to send it as 11:10am every Mon, Tue and Wed',
-        label="When should the notification be sent?",
-        validators=[validate_cron]
-    )
-
     send_after = forms.DateField(
         widget=forms.DateInput(format='%m/%d/%Y', attrs={'class':'col-md-8 col-sm-12'}),
         label='Schedule to Send Starting On',
@@ -78,6 +71,13 @@ class MOUFinalizeForm(forms.Form):
         label='Keep Sending Until',
         help_text='',
         input_formats=[('%m/%d/%Y')]
+    )
+
+    cron = forms.CharField(
+        max_length=20,
+        help_text='Min Hr Day Month WeekDay. Eg: 10 11 * * 1-3 to send it as 11:10am every Mon, Tue and Wed',
+        label="When should the notification be sent?",
+        validators=[validate_cron]
     )
 
     def __init__(self, request, record=None, *args, **kwargs):
@@ -140,6 +140,10 @@ class MOUFinalizeForm(forms.Form):
         record.send_on_after = data.get('send_after')
         record.send_until = data.get('send_until')
         record.cron = data.get('cron')
+
+        academic_year = data.get('academic_year')
+        if academic_year:
+            record.academic_year = academic_year
 
         if commit:
             record.save()
@@ -396,7 +400,7 @@ class MOUEditorForm(forms.Form):
         ),
         label='MOU Text',
         required=False,
-        help_text='Customize with {{signature_1}}, {{signature_2}}, {{signature_3}}, {{signature_4}}, {{highschool_name}}, {{highschool_ceeb}}, {{academic_year}}, {{teacher_list}}, {{choice_teacher_list}}, {{pathways_teacher_list}}, {{pathways_course_list}}, {{choice_course_list}}, {{facilitator_course_list}}',
+        help_text='Customize with {{signature_1}}, {{signature_2}}, {{signature_3}}, {{signature_4}}, {{highschool_name}}, {{highschool_ceeb}}, {{academic_year}}, {{teacher_list}}, {{choice_teacher_list}}, {{pathways_teacher_list}}, {{pathways_course_list}}, {{choice_course_list}}, {{facilitator_course_list}}, {{future_course_list}}, {{role_first_name_Position_Name}} (also role_last_name_..., role_email_..., role_name_...; underscores in position become spaces)',
         validators=[validate_html_short_code]
     )
 
@@ -757,9 +761,11 @@ class AddHighSchoolForm(forms.Form):
         super().__init__(*args, **kwargs)
 
         from cis.models.highschool import HighSchool
-        self.fields['highschools'].queryset = HighSchool.objects.filter(
-            status__iexact='active'
-        ).order_by('name')
+        # Validate against the full queryset (any status). The "Add High
+        # School(s)" modal shows the status column so the user can decide
+        # whether to include non-Active schools; the form silently dropping
+        # them based on status would be surprising.
+        self.fields['highschools'].queryset = HighSchool.objects.order_by('name')
 
         self.fields['action'].initial = kwargs.get('action', 'add_highschools')
         self.fields['mou_id'].initial = mou_id
