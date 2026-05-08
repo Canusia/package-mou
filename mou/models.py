@@ -810,6 +810,15 @@ class MOUSignature(models.Model):
         # historical `course_list`) is always rendered with its real value to
         # preserve backwards compatibility with existing MOU templates. Keys in
         # `choice_keys` but absent from `allowed` are forced to empty string.
+        # Shortcodes whose values are HTML and must not be auto-escaped by the
+        # Django template engine when rendered into mou_text.
+        HTML_SHORTCODES = {
+            'signature_1', 'signature_2', 'signature_3', 'signature_4',
+            'teacher_list', 'choice_teacher_list', 'pathways_teacher_list',
+            'pathways_course_list', 'choice_course_list',
+            'facilitator_course_list', 'course_list', 'future_course_list',
+        }
+
         full_values = {
             'signature_1':             self.signature_asHTML(1),
             'signature_2':             self.signature_asHTML(2),
@@ -817,6 +826,10 @@ class MOUSignature(models.Model):
             'signature_4':             self.signature_asHTML(4),
             'highschool_name':         self.highschool.name,
             'highschool_ceeb':         self.highschool.code,
+            'highschool_address1':     self.highschool.address1 or '',
+            'highschool_city':         self.highschool.city or '',
+            'highschool_state':        self.highschool.state or '',
+            'highschool_zip':          self.highschool.postal_code or '',
             'academic_year':           self.signator_template.mou.academic_year.name,
             'teacher_list':            self.teacher_list,
             'choice_teacher_list':     self.choice_teacher_list,
@@ -827,10 +840,15 @@ class MOUSignature(models.Model):
             'course_list':             self.course_list,
             'future_course_list':      self.future_course_list,
         }
-        context = Context({
-            k: ('' if (k in choice_keys and k not in allowed) else v)
-            for k, v in full_values.items()
-        })
+
+        def _resolve(key, value):
+            if key in choice_keys and key not in allowed:
+                return ''
+            if key in HTML_SHORTCODES:
+                return mark_safe(value or '')
+            return value
+
+        context = Context({k: _resolve(k, v) for k, v in full_values.items()})
 
         return Template(raw_text).render(context)
     

@@ -400,7 +400,6 @@ class MOUEditorForm(forms.Form):
         ),
         label='MOU Text',
         required=False,
-        help_text='Customize with {{signature_1}}, {{signature_2}}, {{signature_3}}, {{signature_4}}, {{highschool_name}}, {{highschool_ceeb}}, {{academic_year}}, {{teacher_list}}, {{choice_teacher_list}}, {{pathways_teacher_list}}, {{pathways_course_list}}, {{choice_course_list}}, {{facilitator_course_list}}, {{future_course_list}}, {{role_first_name_Position_Name}} (also role_last_name_..., role_email_..., role_name_...; underscores in position become spaces)',
         validators=[validate_html_short_code]
     )
 
@@ -429,6 +428,7 @@ class MOUEditorForm(forms.Form):
 
         self.fields['title'].initial = record.title
         self.fields['mou_text'].initial = record.mou_text
+        self.fields['mou_text'].help_text = self._build_mou_text_help()
 
         if not record.can_edit():
             self.fields['title'].disabled = True
@@ -446,6 +446,31 @@ class MOUEditorForm(forms.Form):
             self.helper.form_action = reverse_lazy(
                 'memo:memo', args=[record.id]
             )
+
+    @staticmethod
+    def _build_mou_text_help():
+        from .settings.email_settings import email_settings, AVAILABLE_SHORTCODES
+
+        cfg = email_settings.from_db()
+        configured = cfg.get('available_shortcodes')
+        if configured is None:
+            allowed = {k for k, _ in AVAILABLE_SHORTCODES}
+        else:
+            allowed = set(configured)
+
+        if not allowed:
+            return mark_safe(
+                'No shortcodes are currently enabled. Add them under '
+                '<em>Settings &rarr; MOU Notifications &rarr; Available Shortcodes</em>.'
+            )
+
+        items = [label for key, label in AVAILABLE_SHORTCODES if key in allowed]
+        body = '<ul class="mb-1">' + ''.join(f'<li><code>{label}</code></li>' for label in items) + '</ul>'
+        return mark_safe(
+            'Available shortcodes (from <em>Settings &rarr; MOU Notifications &rarr; '
+            'Available Shortcodes</em>):' + body
+        )
+
 
 class MOUInitForm(forms.Form):
     group_by = forms.ChoiceField(

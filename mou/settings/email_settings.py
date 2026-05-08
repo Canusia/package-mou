@@ -28,6 +28,10 @@ AVAILABLE_SHORTCODES = [
     ('signature_4',             '{{signature_4}} — Signature box (weight 4)'),
     ('highschool_name',         '{{highschool_name}} — High school name'),
     ('highschool_ceeb',         '{{highschool_ceeb}} — High school CEEB code'),
+    ('highschool_address1',     '{{highschool_address1}} — High school street address'),
+    ('highschool_city',         '{{highschool_city}} — High school city'),
+    ('highschool_state',        '{{highschool_state}} — High school state'),
+    ('highschool_zip',          '{{highschool_zip}} — High school ZIP / postal code'),
     ('academic_year',           '{{academic_year}} — Academic year'),
     ('teacher_list',            '{{teacher_list}} — Certified teachers list'),
     ('choice_teacher_list',     '{{choice_teacher_list}} — Choice (CCCL) teachers list'),
@@ -97,10 +101,14 @@ class SettingForm(forms.Form):
             '<li><code>{{ record.teacher_course.status }}</code> &mdash; certification status</li>'
             '<li><code>{{ record.academic_year }}</code> &mdash; academic year</li>'
             '<li><code>{{ record.teaching_or_not }}</code> &mdash; "Yes" / "No"</li>'
-            '<li><code>{{ record.section_display }}</code> &mdash; <em>list</em> of pre-formatted section '
-            'strings, one per section, rendered through the future_sections '
-            '<code>display_template</code> configured at <code>/ce/future_sections/</code>. '
-            'Iterate with <code>{% for line in record.section_display %}{{ line|safe }}<br>{% endfor %}</code>.</li>'
+            '<li><code>{{ record.section_display_html }}</code> &mdash; pre-formatted section '
+            'lines joined with <code>&lt;br&gt;</code> and marked safe, rendered through the '
+            'future_sections <code>display_template</code> configured at '
+            '<code>/ce/future_sections/</code>. Drop in directly &mdash; no iteration or '
+            '<code>|safe</code> needed. Use the list form '
+            '<code>{{ record.section_display }}</code> + '
+            '<code>{% for line in record.section_display %}{{ line }}<br>{% endfor %}</code> '
+            'if you need per-line markup.</li>'
             '<li><code>{{ record.section_info.sections }}</code> &mdash; raw list of section dicts '
             'if you want field-level access</li>'
             '</ul>'
