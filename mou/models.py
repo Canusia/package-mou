@@ -104,11 +104,13 @@ class MOU(models.Model):
         ordering = ['-academic_year', 'title']
 
 
-    def should_message_be_sent(self):
+    def should_message_be_sent(self, now=None):
         if self.status != 'ready':
             return False
 
-        cron_scheduler_start_time = datetime.datetime.now().replace(
+        if now is None:
+            now = datetime.datetime.now()
+        cron_scheduler_start_time = now.replace(
             microsecond=0,
             second=0
         )
