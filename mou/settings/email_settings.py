@@ -60,6 +60,19 @@ class SettingForm(forms.Form):
         widget=forms.CheckboxSelectMultiple(attrs={'class': 'col-md-12'}),
     )
 
+    custom_css = forms.CharField(
+        max_length=None,
+        widget=forms.Textarea(attrs={'rows': 12, 'class': 'col-md-12', 'style': 'font-family: monospace;'}),
+        required=False,
+        help_text=(
+            'Optional CSS injected into the MOU document template (used for both '
+            'on-screen rendering and the generated PDF). Do not include the '
+            '<code>&lt;style&gt;</code> tags &mdash; just the CSS rules. Example: '
+            '<code>body { font-family: Georgia, serif; } h1 { color: #003366; }</code>'
+        ),
+        label='Custom MOU CSS',
+    )
+
     future_course_list_template = forms.CharField(
         max_length=None,
         widget=forms.Textarea(attrs={'rows': 12, 'class': 'col-md-12'}),

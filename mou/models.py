@@ -510,6 +510,8 @@ class MOUSignature(models.Model):
     def download_as_pdf(self, download=True):
         import pdfkit, datetime
     
+        from .settings.email_settings import email_settings as configurator
+
         base_template = 'mou/templates/mou.html'
         template = get_template(base_template)
 
@@ -517,6 +519,7 @@ class MOUSignature(models.Model):
             'generated_on': datetime.datetime.now(),
             'mou_text': self.mou_text,
             'record': self,
+            'custom_css': configurator.from_db().get('custom_css', ''),
         })
         
         options = {
