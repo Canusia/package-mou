@@ -4,6 +4,7 @@ from django.conf import settings
 from django.http import JsonResponse
 from django.urls import reverse_lazy
 from django.core.exceptions import ValidationError
+from django.utils.safestring import mark_safe
 
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit
@@ -78,11 +79,41 @@ class SettingForm(forms.Form):
         widget=forms.Textarea(attrs={'rows': 12, 'class': 'col-md-12'}),
         validators=[validate_html_short_code],
         required=False,
-        help_text=(
-            'Django-template HTML used by the {{future_course_list}} shortcode. '
-            'The variable <code>courses</code> is a queryset of FutureCourse '
-            'records (highschool + academic year, filtered to submitted). Leave '
-            'blank to fall back to the bundled <code>mou/templates/future_section_courses.html</code>.'
+        help_text=mark_safe(
+            'Django-template HTML used by the <code>{{future_course_list}}</code> shortcode. '
+            'Leave blank to fall back to the bundled '
+            '<code>mou/templates/future_section_courses.html</code>.'
+            '<br><br>'
+            '<strong>Context:</strong> <code>courses</code> is a queryset of <code>FutureCourse</code> '
+            'records for this MOU\'s highschool + academic year (only those with '
+            '<code>submitted_on</code> set).'
+            '<br><br>'
+            '<strong>Per-record fields</strong> (use inside <code>{% for record in courses %}</code>):'
+            '<ul class="mb-1">'
+            '<li><code>{{ record.teacher_course.course.title }}</code> &mdash; course title</li>'
+            '<li><code>{{ record.teacher_course.course.name }}</code> &mdash; course code/name</li>'
+            '<li><code>{{ record.teacher_course.teacher_highschool.teacher.user.first_name }}</code> / '
+            '<code>...last_name</code> &mdash; instructor name</li>'
+            '<li><code>{{ record.teacher_course.status }}</code> &mdash; certification status</li>'
+            '<li><code>{{ record.academic_year }}</code> &mdash; academic year</li>'
+            '<li><code>{{ record.teaching_or_not }}</code> &mdash; "Yes" / "No"</li>'
+            '<li><code>{{ record.section_display }}</code> &mdash; <em>list</em> of pre-formatted section '
+            'strings, one per section, rendered through the future_sections '
+            '<code>display_template</code> configured at <code>/ce/future_sections/</code>. '
+            'Iterate with <code>{% for line in record.section_display %}{{ line|safe }}<br>{% endfor %}</code>.</li>'
+            '<li><code>{{ record.section_info.sections }}</code> &mdash; raw list of section dicts '
+            'if you want field-level access</li>'
+            '</ul>'
+            '<strong>Section dict fields</strong> (inside <code>{% for section in record.section_info.sections %}</code>): '
+            '<code>term_name</code>, <code>estimated_enrollment</code>, <code>class_period</code>, '
+            '<code>instruction_mode</code>, <code>highschool_course_name</code>, '
+            '<code>number_of_sections</code>, <code>full_year</code>, <code>trimester</code>, '
+            '<code>fall_only</code>, <code>spring_only</code>, <code>notes</code>, '
+            '<code>teacher_changed</code>, <code>file</code> (uploaded syllabus URL).'
+            '<br><br>'
+            '<strong>Tip:</strong> prefer <code>record.section_display</code> &mdash; admins control its '
+            'format from the future_sections settings page, so the MOU stays in sync without editing '
+            'this template.'
         ),
         label='{{future_course_list}} HTML Template',
     )

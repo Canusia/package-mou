@@ -193,10 +193,13 @@ def sign_mou(request, signature_id):
                 'list-group-item-danger'
             )
 
+    from .settings.email_settings import email_settings as configurator
+
     context = {
         'record': signature,
         'form': form,
-        'page_title': f'{signature.mou_title} - {signature.signator}'
+        'page_title': f'{signature.mou_title} - {signature.signator}',
+        'custom_css': configurator.from_db().get('custom_css', ''),
     }
 
     return render(request, template, context)

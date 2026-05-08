@@ -16,9 +16,13 @@
         <tr>
             <td>{{record.teacher_course.course.title}}</td>
             <td>
-                {% if record.section_info.sections %}
+                {% if record.section_display %}
+                    {% for line in record.section_display %}
+                        {{ line|safe }}<br>
+                    {% endfor %}
+                {% elif record.section_info.sections %}
                     {% for section in record.section_info.sections %}
-                        {{section.term_name}} <br>
+                        {{ section.term_name }}<br>
                     {% endfor %}
                 {% endif %}
             </td>
