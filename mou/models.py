@@ -693,8 +693,6 @@ class MOUSignature(models.Model):
         ).order_by(
             'teacher_course__course__name'
         )
-        print(future_sections.query)
-        print(future_sections.count())
 
         # If the admin configured a custom HTML template for this shortcode,
         # render it as an inline Django template; otherwise fall back to the

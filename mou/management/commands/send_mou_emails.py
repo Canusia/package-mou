@@ -8,7 +8,7 @@ from cis.signals.crontab import cron_task_done, cron_task_started
 
 logger = logging.getLogger(__name__)
 
-from mou.models import MOU, MOUSignature
+from ...models import MOU, MOUSignature
 
 TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
