@@ -1,10 +1,11 @@
+import copy
 import re
 import uuid, datetime
 
 from django.http import HttpResponse
 
 from django.utils import timezone
-from django.db import models
+from django.db import models, transaction
 from django.conf import settings
 from django.contrib.auth.models import Group
 from django.db.models import JSONField
@@ -271,7 +272,37 @@ class MOU(models.Model):
                 'record_id': self.id
             }
         )
-    
+
+    def duplicate(self, created_by):
+        """Create a fresh draft copy of this MOU and its signator chain.
+
+        Copies MOU fields and every MOUSignator row, repointed at the new
+        MOU. Does NOT copy MOUSignature records or attached highschools —
+        the copy starts with no schools and status 'draft'.
+        """
+        with transaction.atomic():
+            new_mou = MOU.objects.create(
+                title=('Copy of ' + self.title)[:100],
+                group_by=self.group_by,
+                cron=self.cron,
+                academic_year=self.academic_year,
+                description=self.description,
+                mou_text=self.mou_text,
+                meta=copy.deepcopy(self.meta) if self.meta else {},
+                status='draft',
+                created_by=created_by,
+            )
+            for sig in MOUSignator.objects.filter(mou=self).order_by('weight'):
+                MOUSignator.objects.create(
+                    mou=new_mou,
+                    created_by=created_by,
+                    weight=sig.weight,
+                    role_type=sig.role_type,
+                    role=sig.role,
+                    meta=copy.deepcopy(sig.meta) if sig.meta else None,
+                )
+        return new_mou
+
     def as_pdf(self):
         ...
 
