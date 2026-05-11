@@ -150,6 +150,7 @@ class MOUBulkActionTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         body = resp.json()
         self.assertEqual(body['status'], 'success')
+        self.assertEqual(body['action'], 'redirect_to')
         self.assertIn('/ce/highschools/mous', body['redirect_to'])
         self.assertFalse(MOU.objects.filter(pk=self.mou.pk).exists())
 

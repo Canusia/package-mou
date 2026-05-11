@@ -161,6 +161,7 @@ def delete_mou(request):
         data = {
             'status': 'success',
             'message': 'Successfully deleted record.',
+            'action': 'redirect_to',
             'redirect_to': str(reverse_lazy('mou_ce:all')),
         }
         status = 200
