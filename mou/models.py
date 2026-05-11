@@ -446,7 +446,7 @@ class MOUSignature(models.Model):
         )
         
         if not signature.exists():
-            return ' '
+            return mark_safe('<em class="text-muted">Not yet signed</em>')
         return signature[0]._signature
     
     def send_notification(self):
