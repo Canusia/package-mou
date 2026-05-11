@@ -1,4 +1,4 @@
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
@@ -126,30 +126,48 @@ def mou_preview(request, record_id):
     )
 
 @user_passes_test(user_has_cis_role, login_url='/')
-def mou_delete(request, record_id):
+def duplicate_mou(request):
+    record = get_object_or_404(MOU, pk=request.GET.get('mou_id'))
+    try:
+        new_mou = record.duplicate(request.user)
+    except Exception as e:
+        return JsonResponse(
+            {'message': 'Unable to complete request', 'errors': str(e)},
+            status=400,
+        )
+    return JsonResponse({
+        'status': 'success',
+        'message': 'MOU duplicated. Click "Ok" to open the copy.',
+        'action': 'redirect_to',
+        'redirect_to': str(new_mou.ce_url),
+    })
 
-    record = get_object_or_404(MOU, pk=record_id)
 
-    if not record.can_edit:
+@user_passes_test(user_has_cis_role, login_url='/')
+def delete_mou(request):
+    record = get_object_or_404(MOU, pk=request.GET.get('mou_id'))
+
+    if record.status == 'ready':
         return JsonResponse({
             'message': 'Unable to complete request',
             'errors': 'The MOU has already been sent'
         }, status=400)
-    
+
     try:
-        MOUSignator.objects.filter(mou=record).delete()
-        record.delete()
+        with transaction.atomic():
+            MOUSignator.objects.filter(mou=record).delete()
+            record.delete()
 
         data = {
-            'status':'success',
-            'message':'Successfully deleted record.',
-            'redirect_to': str(reverse_lazy('mou_ce:all'))
+            'status': 'success',
+            'message': 'Successfully deleted record.',
+            'redirect_to': str(reverse_lazy('mou_ce:all')),
         }
         status = 200
     except Exception as e:
         data = {
             'message': 'Unable to complete request',
-            'errors': str(e)
+            'errors': str(e),
         }
         status = 400
 
@@ -213,7 +231,13 @@ def do_bulk_action(request):
         
     if action == 'change_signature_status':
         return manage_signature_status(request)
-    
+
+    if action == 'duplicate_mou':
+        return duplicate_mou(request)
+
+    if action == 'delete_mou':
+        return delete_mou(request)
+
     if action == 'delete_signator':
         return delete_signator(request)
     

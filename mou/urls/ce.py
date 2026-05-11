@@ -6,9 +6,8 @@ from rest_framework import routers
 
 from ..views import (
     mous,
-    mou, 
+    mou,
     # add_new, delete,
-    mou_delete,
     mou_add_new,
     do_bulk_action,
     MOUViewSet,
@@ -28,7 +27,6 @@ urlpatterns = [
 
     path('mou/add_new', mou_add_new, name='mou_add_new'),
     path('mou/<uuid:record_id>', mou, name='mou'),
-    path('mou/delete/<uuid:record_id>', mou_delete, name='mou_delete'),
     path('mou/do_bulk_action', do_bulk_action, name='bulk_action'),
     
     # path('bulk_message/get_datasource_filters', bulk_message_get_datasource_filters, name='get_datasource_filters'),

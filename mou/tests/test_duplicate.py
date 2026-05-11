@@ -1,7 +1,9 @@
 import uuid
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.test import TestCase
+from django.urls import reverse
 
 
 def _models():
@@ -90,3 +92,71 @@ class MOUDuplicateModelTests(TestCase):
             MOUSignature.objects.filter(signator_template__mou=dup).exists()
         )
         self.assertEqual(MOUSignator.objects.filter(mou=self.mou).count(), 2)
+
+
+class MOUBulkActionTests(TestCase):
+    def setUp(self):
+        from cis.models.term import AcademicYear
+
+        MOU, MOUSignator, MOUSignature = _models()
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            username='ce@example.com', email='ce@example.com',
+            password='x', is_staff=True,
+        )
+        ce_group, _ = Group.objects.get_or_create(name='ce')
+        self.user.groups.add(ce_group)
+
+        from django.contrib.auth.signals import user_logged_in
+        from django_login_history.models import post_login
+        user_logged_in.disconnect(post_login)
+        try:
+            self.client.force_login(self.user)
+        finally:
+            user_logged_in.connect(post_login)
+
+        self.ay = AcademicYear.objects.create(name='2025-26')
+        self.mou = MOU.objects.create(
+            title='Src MOU', cron='*/5 * * * *',
+            academic_year=self.ay, created_by=self.user, status='draft',
+        )
+        MOUSignator.objects.create(
+            mou=self.mou, weight=1, role_type='highschool_admin',
+            role=uuid.uuid4(), created_by=self.user,
+        )
+        self.url = reverse('mou_ce:bulk_action')
+
+    def test_duplicate_mou_action_creates_copy_and_redirects(self):
+        MOU, MOUSignator, _ = _models()
+        resp = self.client.get(self.url, {'action': 'duplicate_mou', 'mou_id': str(self.mou.id)})
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertEqual(body['status'], 'success')
+        self.assertEqual(body['action'], 'redirect_to')
+
+        dup = MOU.objects.exclude(pk=self.mou.pk).get(academic_year=self.ay)
+        self.assertEqual(dup.title, 'Copy of Src MOU')
+        self.assertEqual(dup.status, 'draft')
+        self.assertIn(str(dup.id), body['redirect_to'])
+        self.assertEqual(MOUSignator.objects.filter(mou=dup).count(), 1)
+
+    def test_duplicate_mou_bad_id_returns_404(self):
+        resp = self.client.get(self.url, {'action': 'duplicate_mou', 'mou_id': str(uuid.uuid4())})
+        self.assertEqual(resp.status_code, 404)
+
+    def test_delete_mou_action_deletes_editable_mou(self):
+        MOU, _, _ = _models()
+        resp = self.client.get(self.url, {'action': 'delete_mou', 'mou_id': str(self.mou.id)})
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertEqual(body['status'], 'success')
+        self.assertIn('/ce/highschools/mous', body['redirect_to'])
+        self.assertFalse(MOU.objects.filter(pk=self.mou.pk).exists())
+
+    def test_delete_mou_action_refuses_ready_mou(self):
+        MOU, _, _ = _models()
+        self.mou.status = 'ready'
+        self.mou.save()
+        resp = self.client.get(self.url, {'action': 'delete_mou', 'mou_id': str(self.mou.id)})
+        self.assertEqual(resp.status_code, 400)
+        self.assertTrue(MOU.objects.filter(pk=self.mou.pk).exists())
