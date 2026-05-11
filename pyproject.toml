@@ -8,7 +8,7 @@ version = "0.0.5"
 authors = [
   { name="Avinash Kadaji", email="avi@canusia.com" },
 ]
-description = "MYCE - PD Event"
+description = "MyCE — MOU management with multi-stage digital signatures"
 readme = "README.md"
 requires-python = ">=3.8"
 classifiers = [
