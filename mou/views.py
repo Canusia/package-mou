@@ -22,6 +22,7 @@ from cis.utils import (
 from crispy_forms.utils import render_crispy_form
 
 from .models import MOU, MOUNote, MOUSignature, MOUSignator
+from .actions import mou_actions
 from .forms import (
     MOUInitForm,
     MOUEditorForm,
@@ -125,54 +126,66 @@ def mou_preview(request, record_id):
         }
     )
 
-@user_passes_test(user_has_cis_role, login_url='/')
+@mou_actions.action('general', label='Duplicate MOU', icon='fa fa-copy', scope=['detail'],
+                    slug='duplicate_mou',
+                    confirm='Duplicate this MOU? A new draft copy (including the signator chain) will be created.')
 def duplicate_mou(request):
-    record = get_object_or_404(MOU, pk=request.GET.get('mou_id'))
+    ids = request.POST.getlist('ids[]')
+    if not ids:
+        return JsonResponse({'outcome': 'alert', 'status': 'error', 'title': 'Error', 'message': 'No MOU selected.'})
+    record = get_object_or_404(MOU, pk=ids[0])
     try:
         new_mou = record.duplicate(request.user)
     except Exception as e:
-        return JsonResponse(
-            {'message': 'Unable to complete request', 'errors': str(e)},
-            status=400,
-        )
+        return JsonResponse({'outcome': 'alert', 'status': 'error', 'title': 'Error', 'message': f'Unable to duplicate MOU. {e}'})
     return JsonResponse({
-        'status': 'success',
-        'message': 'MOU duplicated. Click "Ok" to open the copy.',
-        'action': 'redirect_to',
-        'redirect_to': str(new_mou.ce_url),
+        'outcome': 'call',
+        'fn': 'mouGoTo',
+        'args': {
+            'title': 'Done',
+            'message': 'MOU duplicated. Opening the copy…',
+            'status': 'success',
+            'url': str(new_mou.ce_url),
+        },
     })
 
 
-@user_passes_test(user_has_cis_role, login_url='/')
+@mou_actions.action('danger', label='Delete MOU', icon='fa fa-trash-alt', scope=['detail'],
+                    slug='delete_mou',
+                    confirm='Are you sure you want to permanently delete this MOU?')
 def delete_mou(request):
-    record = get_object_or_404(MOU, pk=request.GET.get('mou_id'))
+    ids = request.POST.getlist('ids[]')
+    if not ids:
+        return JsonResponse({'outcome': 'alert', 'status': 'error', 'title': 'Error', 'message': 'No MOU selected.'})
+    record = get_object_or_404(MOU, pk=ids[0])
 
+    # MOU.can_edit() unconditionally returns True (dead code below it), so the
+    # original guard never fired — check status directly so a sent MOU is
+    # actually refused (confirmed intended behavior).
     if record.status == 'ready':
-        return JsonResponse({
-            'message': 'Unable to complete request',
-            'errors': 'The MOU has already been sent'
-        }, status=400)
-
+        return JsonResponse({'outcome': 'alert', 'status': 'error', 'title': 'Unable to complete request',
+                             'message': 'The MOU has already been sent.'})
     try:
         with transaction.atomic():
             MOUSignator.objects.filter(mou=record).delete()
             record.delete()
-
-        data = {
-            'status': 'success',
-            'message': 'Successfully deleted record.',
-            'action': 'redirect_to',
-            'redirect_to': str(reverse_lazy('mou_ce:all')),
-        }
-        status = 200
     except Exception as e:
-        data = {
-            'message': 'Unable to complete request',
-            'errors': str(e),
-        }
-        status = 400
+        return JsonResponse({'outcome': 'alert', 'status': 'error', 'title': 'Error', 'message': f'Unable to delete MOU. {e}'})
+    return JsonResponse({
+        'outcome': 'call',
+        'fn': 'mouGoTo',
+        'args': {
+            'title': 'Done',
+            'message': 'MOU deleted.',
+            'status': 'success',
+            'url': str(reverse_lazy('mou_ce:all')),
+        },
+    })
 
-    return JsonResponse(data, status=status)
+
+@user_passes_test(user_has_cis_role, login_url='/')
+def mou_action_dispatch(request):
+    return mou_actions.dispatch(request, request.POST.get('action'))
 
 def sign_mou(request, signature_id):
     signature = get_object_or_404(MOUSignature, pk=signature_id)
@@ -232,12 +245,6 @@ def do_bulk_action(request):
         
     if action == 'change_signature_status':
         return manage_signature_status(request)
-
-    if action == 'duplicate_mou':
-        return duplicate_mou(request)
-
-    if action == 'delete_mou':
-        return delete_mou(request)
 
     if action == 'delete_signator':
         return delete_signator(request)

@@ -94,7 +94,7 @@ class MOUDuplicateModelTests(TestCase):
         self.assertEqual(MOUSignator.objects.filter(mou=self.mou).count(), 2)
 
 
-class MOUBulkActionTests(TestCase):
+class MOUActionRegistryTests(TestCase):
     def setUp(self):
         from cis.models.term import AcademicYear
 
@@ -124,40 +124,55 @@ class MOUBulkActionTests(TestCase):
             mou=self.mou, weight=1, role_type='highschool_admin',
             role=uuid.uuid4(), created_by=self.user,
         )
-        self.url = reverse('mou_ce:bulk_action')
+        self.url = reverse('mou_ce:actions')
 
-    def test_duplicate_mou_action_creates_copy_and_redirects(self):
+    def test_duplicate_action_creates_copy_and_returns_navigate_call(self):
         MOU, MOUSignator, _ = _models()
-        resp = self.client.get(self.url, {'action': 'duplicate_mou', 'mou_id': str(self.mou.id)})
+        resp = self.client.post(self.url, {'action': 'duplicate_mou', 'ids[]': [str(self.mou.id)]})
         self.assertEqual(resp.status_code, 200)
         body = resp.json()
-        self.assertEqual(body['status'], 'success')
-        self.assertEqual(body['action'], 'redirect_to')
+        self.assertEqual(body['outcome'], 'call')
+        self.assertEqual(body['fn'], 'mouGoTo')
 
         dup = MOU.objects.exclude(pk=self.mou.pk).get(academic_year=self.ay)
         self.assertEqual(dup.title, 'Copy of Src MOU')
         self.assertEqual(dup.status, 'draft')
-        self.assertIn(str(dup.id), body['redirect_to'])
+        self.assertIn(str(dup.id), body['args']['url'])
         self.assertEqual(MOUSignator.objects.filter(mou=dup).count(), 1)
 
-    def test_duplicate_mou_bad_id_returns_404(self):
-        resp = self.client.get(self.url, {'action': 'duplicate_mou', 'mou_id': str(uuid.uuid4())})
-        self.assertEqual(resp.status_code, 404)
-
-    def test_delete_mou_action_deletes_editable_mou(self):
-        MOU, _, _ = _models()
-        resp = self.client.get(self.url, {'action': 'delete_mou', 'mou_id': str(self.mou.id)})
+    def test_duplicate_action_no_ids_returns_alert(self):
+        resp = self.client.post(self.url, {'action': 'duplicate_mou'})
         self.assertEqual(resp.status_code, 200)
         body = resp.json()
-        self.assertEqual(body['status'], 'success')
-        self.assertEqual(body['action'], 'redirect_to')
-        self.assertIn('/ce/highschools/mous', body['redirect_to'])
+        self.assertEqual(body['outcome'], 'alert')
+        self.assertEqual(body['status'], 'error')
+
+    def test_duplicate_action_unknown_mou_id_returns_404(self):
+        resp = self.client.post(self.url, {'action': 'duplicate_mou', 'ids[]': [str(uuid.uuid4())]})
+        self.assertEqual(resp.status_code, 404)
+
+    def test_unknown_action_returns_alert_400(self):
+        resp = self.client.post(self.url, {'action': 'no_such_action', 'ids[]': [str(self.mou.id)]})
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json()['outcome'], 'alert')
+
+    def test_delete_action_deletes_editable_mou_and_returns_navigate_call(self):
+        MOU, _, _ = _models()
+        resp = self.client.post(self.url, {'action': 'delete_mou', 'ids[]': [str(self.mou.id)]})
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertEqual(body['outcome'], 'call')
+        self.assertEqual(body['fn'], 'mouGoTo')
+        self.assertIn('/ce/highschools/mous', body['args']['url'])
         self.assertFalse(MOU.objects.filter(pk=self.mou.pk).exists())
 
-    def test_delete_mou_action_refuses_ready_mou(self):
+    def test_delete_action_refuses_ready_mou(self):
         MOU, _, _ = _models()
         self.mou.status = 'ready'
         self.mou.save()
-        resp = self.client.get(self.url, {'action': 'delete_mou', 'mou_id': str(self.mou.id)})
-        self.assertEqual(resp.status_code, 400)
+        resp = self.client.post(self.url, {'action': 'delete_mou', 'ids[]': [str(self.mou.id)]})
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertEqual(body['outcome'], 'alert')
+        self.assertEqual(body['status'], 'error')
         self.assertTrue(MOU.objects.filter(pk=self.mou.pk).exists())

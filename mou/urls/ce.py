@@ -10,6 +10,7 @@ from ..views import (
     # add_new, delete,
     mou_add_new,
     do_bulk_action,
+    mou_action_dispatch,
     MOUViewSet,
     MOUSignatorViewSet,
     MOUSignatureViewSet
@@ -28,6 +29,7 @@ urlpatterns = [
     path('mou/add_new', mou_add_new, name='mou_add_new'),
     path('mou/<uuid:record_id>', mou, name='mou'),
     path('mou/do_bulk_action', do_bulk_action, name='bulk_action'),
+    path('mou/actions', mou_action_dispatch, name='actions'),
     
     # path('bulk_message/get_datasource_filters', bulk_message_get_datasource_filters, name='get_datasource_filters'),
     # path('bulk_message/preview/<uuid:record_id>', bulk_message_preview, name='bulk_message_preview'),
