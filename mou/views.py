@@ -653,6 +653,7 @@ def mou(request, record_id):
             # 'recipient_form': recipient_form,
             'record': record,
             'signator': signator,
+            'detail_actions': mou_actions.for_scope('detail', request.user),
             }
         )
 
