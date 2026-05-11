@@ -25,14 +25,12 @@
             if (!confirm("Are you sure you want to permanently delete this record?"))
                 return;
 
-            let url = "{% url 'mou_ce:mou_delete' record.id %}"
-            let modal = "modal-bulk_actions"
-            let data = ""
+            let url = "{% url 'mou_ce:bulk_action' %}"
 
             $.ajax({
                 type: "GET",
                 url: url,
-                data: data,
+                data: { action: 'delete_mou', mou_id: '{{record.id}}' },
                 success: function (response) {
                     swal({
                         title: 'Success',
@@ -51,7 +49,7 @@
                 },
                 error: function (xhr, status, errorThrown) {
                     var span = document.createElement('span')
-                    span.innerHTML = xhr.responseJSON.errors
+                    span.innerHTML = xhr.responseJSON ? xhr.responseJSON.errors : 'Error'
 
                     swal({
                         title: 'Unable to complete request',
@@ -59,6 +57,45 @@
                         icon: 'warning'
                     });
                 }
+            });
+
+            return false;
+        });
+
+        $("input.duplicate").on("click", function () {
+            swal({
+                title: 'Duplicate this MOU?',
+                text: 'A new draft copy (including the signator chain) will be created.',
+                icon: 'warning',
+                buttons: true,
+            }).then((confirmed) => {
+                if (!confirmed) return;
+
+                $.ajax({
+                    type: "GET",
+                    url: "{% url 'mou_ce:bulk_action' %}",
+                    data: { action: 'duplicate_mou', mou_id: '{{record.id}}' },
+                    success: function (response) {
+                        swal({
+                            title: 'Success',
+                            text: response.message,
+                            icon: response.status
+                        }).then((value) => {
+                            if (response.action == 'redirect_to')
+                                location.href = response.redirect_to;
+                        });
+                    },
+                    error: function (xhr, status, errorThrown) {
+                        var span = document.createElement('span')
+                        span.innerHTML = xhr.responseJSON ? xhr.responseJSON.errors : 'Error'
+
+                        swal({
+                            title: 'Unable to complete request',
+                            content: span,
+                            icon: 'warning'
+                        });
+                    }
+                });
             });
 
             return false;
@@ -235,6 +272,7 @@
                                 
                                     <input type="submit" class="btn btn-primary btn-sm" value="Save">
                                     <input type="button" value="Delete" class="btn btn-danger btn-sm delete float-right">
+                                    <input type="button" value="Duplicate" class="btn btn-secondary btn-sm duplicate float-right mr-2">
                                 </form>
                             {% else %}
                                 <p class="alert alert-info">The MOU has been marked as ready and cannot be edited.</p>
