@@ -9,7 +9,7 @@ Manages Memorandums of Understanding with digital signature collection from scho
 ## Key Components
 
 ### Models (`models.py`)
-- **MOU** - Document with title, academic year, template text, CRON schedule
+- **MOU** - Document with title, academic year, template text, CRON schedule. `manager` (CustomUser FK, optional) — primary contact for change-request notifications.
 - **MOUSignator** - Signature template defining who signs and order (weight 1-4)
 - **MOUSignature** - Actual signature records per school/signer combination
 - **MOUNote** - Internal notes on MOUs
@@ -21,6 +21,8 @@ Manages Memorandums of Understanding with digital signature collection from scho
 
 ### Signature Status Flow
 `''` (not ready) → `'pending'` → `'signed'`
+
+A signer may instead submit a **change request** from the sign page, which moves the record to `'changes_requested'` and pauses the chain (no `next_signator()` call). An admin then either edits the MOU and uses the existing `change_signature_status` bulk action to flip the row back to `'pending'`, or leaves it as a record of why the school declined.
 
 ### URL Structure
 - `/ce/highschools/mous/` - MOU management interface
@@ -72,6 +74,15 @@ Use in `mou_text` field:
 6. On signature, `next_signator()` activates next signer in chain
 7. Confirmation email sent to signer
 
+## Change Request Flow
+
+1. Signer opens public sign page.
+2. Instead of signing, clicks **Request Changes Instead**, enters a comment, submits.
+3. View `sign_mou` (`mou/views.py`) routes POSTs with `action=request_changes` through `MOURequestChangesForm` (`mou/forms.py`).
+4. Form sets `MOUSignature.status='changes_requested'`, stores `meta.change_request_comment` + `meta.change_requested_on`, creates an audit `MOUNote` (`meta.type='change_request'`), and calls `signature.send_change_request_notification()`.
+5. Email is sent to `MOU.manager.email` if set; otherwise to the comma-separated `notify_address` setting.
+6. To re-open for signing, an admin uses the existing `change_signature_status` bulk action to flip the row back to `pending`. The standard pending-notification email then re-invites the signer.
+
 ## Commands
 
 ```bash
@@ -104,6 +115,7 @@ Edit via the standard MyCE Settings UI (`/ce/settings/`, look for
 | `college_administrator_2` | user FK | Auto-attached as a weight-4 signator on every MOU. |
 | `email_subject` / `email_message` | text / HTML | "Pending Signature" email. Supports `{{highschool_name}}`, `{{role}}`, `{{signator_firstname}}`, `{{signature_lastname}}`, `{{mou_title}}`, `{{signature_url}}`. |
 | `signed_email_subject` / `signed_email_message` | text / HTML | "Signature Received" email. Supports the same variables plus `{{mou_download_link}}`. |
+| `change_request_email_subject` / `change_request_email_message` | text / HTML | "Change Requested" email sent to `MOU.manager` (fallback: `notify_address`) when a signer submits a change request. Supports `{{highschool_name}}`, `{{signator_firstname}}`, `{{signator_lastname}}`, `{{mou_title}}`, `{{comment}}`, `{{mou_url}}`, `{{signature_url}}`. |
 | `available_shortcodes` | multi-select | Allowlist of shortcodes substituted in `mou_text`. Unchecked shortcodes render as empty strings. The `role_lookup` choice covers the entire `{{role_<attr>_<Position>}}` family. |
 | `future_course_list_template` | HTML | Django-template HTML used by `{{future_course_list}}`. Receives `courses` (FutureCourse queryset). Leave blank to use the bundled `mou/templates/future_section_courses.html`. |
 
