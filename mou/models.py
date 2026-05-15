@@ -445,13 +445,15 @@ class MOUSignature(models.Model):
     )
 
     STATUS_PENDING = 'pending'
+    STATUS_CHANGES_REQUESTED = 'changes_requested'
     STATUS_OPTIONS = [
         ('', 'Not Ready To Sign'),
         ('pending', 'Pending Signature'),
+        ('changes_requested', 'Changes Requested'),
         ('signed', 'Signed'),
     ]
     status = models.CharField(
-        max_length=10,
+        max_length=20,
         verbose_name='Status',
         choices=STATUS_OPTIONS,
         blank=True,
