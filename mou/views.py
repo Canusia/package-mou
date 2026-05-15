@@ -31,7 +31,8 @@ from .forms import (
     MOUSignatureChangeStatusForm,
     MOUSignatureForm,
     MOUSignatorDeleteForm,
-    MOUSignatureDeleteForm
+    MOUSignatureDeleteForm,
+    MOURequestChangesForm,
 )
 
 from cis.menu import (
@@ -190,46 +191,57 @@ def mou_action_dispatch(request):
 def sign_mou(request, signature_id):
     signature = get_object_or_404(MOUSignature, pk=signature_id)
 
-    # if not signature.is_ready_to_be_signed():
-    #     from django.core.exceptions import BadRequest
-
-    #     raise BadRequest('The signature record is not ready to be signed.')
-    
-    # show the mou and collect signature
     template = 'mou/sign_mou.html'
-    form = MOUSignatureForm(
-        record=signature
-    )
+    form = MOUSignatureForm(record=signature)
+    change_request_form = MOURequestChangesForm(record=signature)
 
     if request.method == 'POST':
-        form = MOUSignatureForm(
-            record=signature,
-            data=request.POST
-        )
-
-        if form.is_valid():
-            signature = form.save(signature)
-
-            messages.add_message(
-                request,
-                messages.SUCCESS,
-                'Successfully signed MOU. A confirmation email has been sent to you.',
-                'list-group-item-success'
+        if request.POST.get('action') == 'request_changes':
+            change_request_form = MOURequestChangesForm(
+                record=signature,
+                data=request.POST,
             )
-            return redirect('mou:sign', signature_id=signature_id)
+            if change_request_form.is_valid():
+                change_request_form.save(signature)
+                messages.add_message(
+                    request,
+                    messages.SUCCESS,
+                    'Your change request has been submitted. The MOU manager will follow up.',
+                    'list-group-item-success',
+                )
+                return redirect('mou:sign', signature_id=signature_id)
+            else:
+                messages.add_message(
+                    request,
+                    messages.ERROR,
+                    'Please describe the changes you would like. ' + str(change_request_form.errors),
+                    'list-group-item-danger',
+                )
         else:
-            messages.add_message(
-                request,
-                messages.ERROR,
-                'Please correct the errors and try again ' + str(form.errors),
-                'list-group-item-danger'
-            )
+            form = MOUSignatureForm(record=signature, data=request.POST)
+            if form.is_valid():
+                signature = form.save(signature)
+                messages.add_message(
+                    request,
+                    messages.SUCCESS,
+                    'Successfully signed MOU. A confirmation email has been sent to you.',
+                    'list-group-item-success',
+                )
+                return redirect('mou:sign', signature_id=signature_id)
+            else:
+                messages.add_message(
+                    request,
+                    messages.ERROR,
+                    'Please correct the errors and try again ' + str(form.errors),
+                    'list-group-item-danger',
+                )
 
     from .settings.email_settings import email_settings as configurator
 
     context = {
         'record': signature,
         'form': form,
+        'change_request_form': change_request_form,
         'page_title': f'{signature.mou_title} - {signature.signator}',
         'custom_css': configurator.from_db().get('custom_css', ''),
     }
