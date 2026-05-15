@@ -71,6 +71,15 @@ class MOU(models.Model):
         null=True
     )
 
+    manager = models.ForeignKey(
+        'cis.CustomUser',
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        related_name='managed_mous',
+        verbose_name='MOU Manager',
+    )
+
     mou_text = models.TextField(
         blank=True,
         null=True
