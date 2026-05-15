@@ -530,6 +530,50 @@ class MOUSignature(models.Model):
             to
         )
 
+    def send_change_request_notification(self):
+        notif_settings = configs.from_db()
+
+        subject = notif_settings.get('change_request_email_subject', 'MOU Change Request')
+        body_raw = notif_settings.get('change_request_email_message', '')
+        if not body_raw:
+            return  # nothing configured; skip silently
+
+        mou = self.signator_template.mou
+        if mou.manager and mou.manager.email:
+            to = [mou.manager.email]
+        else:
+            fallback = notif_settings.get('notify_address') or ''
+            to = [addr.strip() for addr in fallback.split(',') if addr.strip()]
+
+        if not to:
+            return
+
+        if getattr(settings, 'DEBUG', True):
+            fallback = notif_settings.get('notify_address') or ''
+            debug_to = [addr.strip() for addr in fallback.split(',') if addr.strip()]
+            if debug_to:
+                to = debug_to
+
+        context = Context({
+            'highschool_name': self.highschool.name,
+            'signator_firstname': self.signator.first_name,
+            'signator_lastname': self.signator.last_name,
+            'mou_title': self.mou_title,
+            'comment': self.meta.get('change_request_comment', ''),
+            'mou_url': getDomain() + str(mou.ce_url),
+            'signature_url': self.signature_url,
+        })
+        text_body = Template(body_raw).render(context)
+        html_body = get_template('cis/email.html').render({'message': text_body})
+
+        send_html_mail(
+            subject,
+            text_body,
+            html_body,
+            settings.DEFAULT_FROM_EMAIL,
+            to,
+        )
+
     def is_ready_to_be_signed(self):
         return True if self.status == 'pending' else False
     
