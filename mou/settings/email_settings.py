@@ -182,6 +182,20 @@ class SettingForm(forms.Form):
         help_text='Supports HTML. Customize the message with {{highschool_name}}, {{role}},{{signator_firstname}}, {{signature_lastname}}, {{mou_title}}, {{mou_download_link}}. <a href="#" class="float-right" onClick="do_bulk_action(\'mou.email_settings\', \'signed_email_message\')" >See Preview</a>',
         label="Signature Received - Email")
 
+    change_request_email_subject = forms.CharField(
+        max_length=200,
+        required=False,
+        help_text='',
+        label="Change Request - Email Subject")
+
+    change_request_email_message = forms.CharField(
+        max_length=None,
+        required=False,
+        widget=forms.Textarea,
+        validators=[validate_html_short_code],
+        help_text='Supports HTML. Sent to the MOU Manager (or the Notification List if no manager is assigned) when a signer requests changes. Customize with {{highschool_name}}, {{signator_firstname}}, {{signator_lastname}}, {{mou_title}}, {{comment}}, {{mou_url}}, {{signature_url}}. <a href="#" class="float-right" onClick="do_bulk_action(\'mou.email_settings\', \'change_request_email_message\')" >See Preview</a>',
+        label="Change Request - Email")
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -243,7 +257,11 @@ class email_settings(SettingForm):
         elif field_name == 'signed_email_message':
             email = email_settings.get('signed_email_message')
             subject = email_settings.get('signed_email_subject')
-        
+
+        elif field_name == 'change_request_email_message':
+            email = email_settings.get('change_request_email_message')
+            subject = email_settings.get('change_request_email_subject')
+
         email_template = Template(email)
         context = Context({
             'signator_firstname': request.user.first_name,
@@ -252,7 +270,9 @@ class email_settings(SettingForm):
             'mou_title': "MOU Title",
             'role': "Role",
             'signature_url': "https://someurl.com",
-            'mou_download_link': 'https://downloadurl.com'
+            'mou_download_link': 'https://downloadurl.com',
+            'comment': 'Example comment from the signer about MOU language.',
+            'mou_url': 'https://someurl.com/ce/highschools/mous/mou/<uuid>',
         })
 
         text_body = email_template.render(context)
@@ -277,6 +297,15 @@ class email_settings(SettingForm):
         defaults = {
             'is_active': "Debug",
             'available_shortcodes': [k for k, _ in AVAILABLE_SHORTCODES],
+            'change_request_email_subject': 'MOU Change Request — {{highschool_name}}',
+            'change_request_email_message': (
+                '<p>{{signator_firstname}} {{signator_lastname}} from '
+                '{{highschool_name}} has requested changes to <strong>{{mou_title}}</strong>.</p>'
+                '<p><strong>Comment:</strong></p>'
+                '<blockquote>{{comment}}</blockquote>'
+                '<p><a href="{{mou_url}}">Open MOU</a> &middot; '
+                '<a href="{{signature_url}}">Signer link</a></p>'
+            ),
         }
 
         try:
