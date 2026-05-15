@@ -702,7 +702,60 @@ class MOUSignatureForm(forms.Form):
             raise ValidationError(_('Signature is required. Please sign in the box below.'), code='invalid')
 
         return cleaned_data
-    
+
+
+class MOURequestChangesForm(forms.Form):
+
+    action = forms.CharField(
+        required=True,
+        widget=forms.HiddenInput,
+        initial='request_changes',
+    )
+
+    change_request_comment = forms.CharField(
+        label='What changes would you like to see in this MOU?',
+        required=True,
+        widget=forms.Textarea(attrs={'rows': 6, 'class': 'col-12'}),
+        help_text='Describe the language or terms you would like changed. The MOU manager will follow up.',
+    )
+
+    def __init__(self, record, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.record = record
+
+        self.helper = FormHelper()
+        self.helper.form_method = 'POST'
+        self.helper.form_id = 'frm_mou_request_changes'
+        self.helper.form_action = reverse_lazy(
+            'mou:sign', kwargs={'signature_id': record.id}
+        )
+
+    def save(self, signature):
+        comment = self.cleaned_data['change_request_comment']
+
+        if not signature.meta:
+            signature.meta = {}
+        signature.meta['change_request_comment'] = comment
+        signature.meta['change_requested_on'] = datetime.datetime.now().strftime('%m/%d/%Y %I:%M %p')
+        signature.status = 'changes_requested'
+        signature.save()
+
+        # Audit trail: MOUNote on the parent MOU.
+        MOUNote.objects.create(
+            meo=signature.signator_template.mou,
+            createdby=signature.signator,
+            note=(
+                f'Change request from {signature.signator.first_name} '
+                f'{signature.signator.last_name} '
+                f'({signature.highschool.name}): {comment}'
+            ),
+            meta={'type': 'change_request'},
+        )
+
+        signature.send_change_request_notification()
+        return signature
+
+
 class MOUSignatureChangeStatusForm(forms.Form):
     ids = forms.MultipleChoiceField(
         required=False,
