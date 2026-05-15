@@ -80,6 +80,13 @@ class MOUFinalizeForm(forms.Form):
         validators=[validate_cron]
     )
 
+    manager = forms.ModelChoiceField(
+        queryset=None,
+        label='MOU Manager',
+        required=False,
+        help_text='Primary contact for change-request notifications. Falls back to the global Notification List if blank.',
+    )
+
     def __init__(self, request, record=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -110,12 +117,17 @@ class MOUFinalizeForm(forms.Form):
 
         self.fields['cron'].initial = record.cron
 
+        self.fields['manager'].queryset = CustomUser.objects.filter(
+            groups__name='ce'
+        ).order_by('first_name', 'last_name')
+        self.fields['manager'].initial = record.manager_id
 
         if not record.can_edit():
             self.fields['status'].disabled = True
             self.fields['cron'].disabled = True
             self.fields['send_after'].disabled = True
             self.fields['send_until'].disabled = True
+            self.fields['manager'].disabled = True
 
         if request:
             self.helper.form_action = reverse_lazy(
@@ -144,6 +156,8 @@ class MOUFinalizeForm(forms.Form):
         academic_year = data.get('academic_year')
         if academic_year:
             record.academic_year = academic_year
+
+        record.manager = data.get('manager')
 
         if commit:
             record.save()
