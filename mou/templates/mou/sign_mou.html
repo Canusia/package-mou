@@ -71,11 +71,42 @@
                                 id="frm_mou_sign">
                                     
                                     {% csrf_token %}
+                                    <input type="hidden" name="action" value="sign">
                                     {{ form | crispy }}
-                                
+
                                     <input type="submit" class="btn btn-primary btn-sm submit" value="Sign and Submit">
                                 </form>
+                                <hr>
+                                <div class="text-center text-muted small mb-2">— or —</div>
+                                <button type="button"
+                                        class="btn btn-outline-secondary btn-sm btn-block"
+                                        onclick="document.getElementById('change_request_box').style.display='block'; this.style.display='none';">
+                                    Request Changes Instead
+                                </button>
+                                <div id="change_request_box" style="display:none; margin-top: 1rem;">
+                                    <h5>Request Changes</h5>
+                                    <p class="text-muted small">Use this if you want changes to the MOU language before signing. Your comment will go to the MOU manager.</p>
+                                    <form method="POST" id="frm_mou_request_changes">
+                                        {% csrf_token %}
+                                        {{ change_request_form | crispy }}
+                                        <input type="submit" class="btn btn-warning btn-sm submit" value="Submit Change Request">
+                                    </form>
+                                </div>
                             {% else %}
+                                {% if record.status == 'changes_requested' %}
+                                    <div class="alert alert-warning">
+                                        <strong>Change request submitted</strong>
+                                        {% if record.meta.change_requested_on %}
+                                            on {{ record.meta.change_requested_on }}
+                                        {% endif %}.
+                                        <p class="mb-0 mt-2">The MOU manager has been notified and will follow up. You will be invited to sign again once the MOU is updated.</p>
+                                        {% if record.meta.change_request_comment %}
+                                            <hr>
+                                            <small><strong>Your comment:</strong></small>
+                                            <p class="mb-0"><em>{{ record.meta.change_request_comment }}</em></p>
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
                                 <p class="alert alert-info">The MOU has been signed by you.
                                     <br><br>
                                     <a href='{{record.as_pdf_url|safe}}'>Download PDF</a>
