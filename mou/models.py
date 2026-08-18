@@ -197,21 +197,44 @@ class MOU(models.Model):
                 return v
         return '-'
 
-    def initialize_signature_status(self):    
-        pending_signatures = MOUSignature.objects.filter(
+    def initialize_signature_status(self):
+        """Mark the current unsigned person at each school as Next Up.
+
+        Next Up means it is their turn; it is not an email. Pending is set
+        only after send_notification actually sends.
+        """
+        count = 0
+        for sig in self.current_unsigned_signatures():
+            if sig.status in ('', None):
+                sig.mark_as_next()
+                count += 1
+        return count
+
+    def current_unsigned_signatures(self):
+        """Lowest-order unsigned signer per school (first email or reminder)."""
+        return MOUSignature.objects.filter(
             signator_template__mou=self,
-            status__in=['', 'pending']
+        ).exclude(
+            status__in=['signed', 'changes_requested'],
         ).order_by(
             'highschool__name',
-            'signator_template__weight'
+            'signator_template__weight',
         ).distinct(
             'highschool__name'
         )
 
-        for pending in pending_signatures:
-            pending.mark_as_pending()
-
-        return pending_signatures.count()
+    def open_change_requests(self):
+        """Signatures waiting on CE to review a signer's requested edits."""
+        return MOUSignature.objects.filter(
+            signator_template__mou=self,
+            status='changes_requested',
+        ).select_related(
+            'highschool',
+            'signator',
+            'signator_template',
+        ).order_by(
+            '-created_on',
+        )
     
     def initialize_signatures(self):
         if self.can_edit():
@@ -308,6 +331,8 @@ class MOU(models.Model):
                     weight=sig.weight,
                     role_type=sig.role_type,
                     role=sig.role,
+                    college_user=sig.college_user,
+                    title=sig.title,
                     meta=copy.deepcopy(sig.meta) if sig.meta else None,
                 )
         return new_mou
@@ -394,6 +419,25 @@ class MOUSignator(models.Model):
         verbose_name='Role'
     )
 
+    # College signers are named people (same on every school's copy), not a
+    # HS/district position UUID. Stored on the row so weight is not hard-wired
+    # to college_administrator_1/2 in settings.
+    college_user = models.ForeignKey(
+        'cis.CustomUser',
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        related_name='mou_college_signator_roles',
+        verbose_name='College Signer',
+    )
+    title = models.CharField(
+        max_length=200,
+        blank=True,
+        default='',
+        verbose_name='Signer Title',
+        help_text='Shown on the signature block. Used for college administrators; school/district rows still resolve the position name.',
+    )
+
     meta = JSONField(blank=True, null=True)
 
     @property
@@ -414,7 +458,7 @@ class MOUSignator(models.Model):
             except:
                 return 'District Position Not Found'
         elif self.role_type == 'college_admin':
-            return 'College Administrator'
+            return self.title or 'College Administrator'
             
 class MOUSignature(models.Model):
     """
@@ -445,9 +489,11 @@ class MOUSignature(models.Model):
     )
 
     STATUS_PENDING = 'pending'
+    STATUS_NEXT = 'next'
     STATUS_CHANGES_REQUESTED = 'changes_requested'
     STATUS_OPTIONS = [
         ('', 'Not Ready To Sign'),
+        ('next', 'Next Up'),
         ('pending', 'Pending Signature'),
         ('changes_requested', 'Changes Requested'),
         ('signed', 'Signed'),
@@ -477,6 +523,19 @@ class MOUSignature(models.Model):
             if k == self.status:
                 return v
         return 'N/A'
+
+    @property
+    def notified_on_display(self):
+        """When the last please-sign / reminder email went out (empty if never)."""
+        return (self.meta or {}).get('notified_on') or ''
+
+    @property
+    def change_request_comment(self):
+        return (self.meta or {}).get('change_request_comment') or ''
+
+    @property
+    def change_requested_on(self):
+        return (self.meta or {}).get('change_requested_on') or ''
     
     def signature_asHTML(self, weight=1):
         
@@ -492,15 +551,37 @@ class MOUSignature(models.Model):
         return signature[0]._signature
     
     def send_notification(self):
-        
-        notif_settings = configs.from_db()
+        from .settings.helpers import notification_recipients
 
-        if self.status == 'pending':
-            email_template = Template(notif_settings.get('email_message', 'change me'))
-            subject = notif_settings.get('email_subject')
+        notif_settings = configs.from_db()
+        please_sign_statuses = ('', None, 'next', 'pending')
+
+        if self.status in please_sign_statuses:
+            # First send uses the request copy; later sends (cron / Send
+            # Signature Link again) use reminder_* when set. Status stays
+            # blank / Next Up until this send succeeds — pending means emailed.
+            count = 0
+            if self.meta:
+                try:
+                    count = int(self.meta.get('notification_count') or 0)
+                except (TypeError, ValueError):
+                    count = 0
+            use_reminder = count >= 1
+            if use_reminder and (notif_settings.get('reminder_email_message') or '').strip():
+                body_raw = notif_settings.get('reminder_email_message')
+                subject = (
+                    notif_settings.get('reminder_email_subject')
+                    or notif_settings.get('email_subject')
+                )
+            else:
+                body_raw = notif_settings.get('email_message', 'change me')
+                subject = notif_settings.get('email_subject')
+            email_template = Template(body_raw)
         elif self.status == 'signed':
             email_template = Template(notif_settings.get('signed_email_message', 'change me'))
             subject = notif_settings.get('signed_email_subject')
+        else:
+            return
 
         context = Context({
             'highschool_name': self.highschool.name,
@@ -512,10 +593,9 @@ class MOUSignature(models.Model):
             'mou_download_link': self.as_pdf_url,
         })
         text_body = email_template.render(context)
-        to = [self.signator.email]
-
-        if getattr(settings, 'DEBUG', True):
-            to = notif_settings.get('notify_address', 'kadaji@gmail.com').split(',')
+        to = notification_recipients([self.signator.email], notif_settings)
+        if not to:
+            return
 
         template = get_template('cis/email.html')
         html_body = template.render({
@@ -530,7 +610,109 @@ class MOUSignature(models.Model):
             to
         )
 
+        if self.status in please_sign_statuses:
+            meta = dict(self.meta or {})
+            stamp = timezone.localtime(timezone.now()).strftime('%m/%d/%Y %I:%M %p')
+            meta['notification_count'] = count + 1
+            meta['notified_on'] = stamp
+            self.meta = meta
+            self.status = 'pending'
+            self.save(update_fields=['status', 'meta'])
+            # First please-sign email for this school also notifies later
+            # signers once, without a signing link.
+            if count == 0:
+                self.send_heads_up_to_later_signers(notif_settings)
+
+    def send_heads_up_to_later_signers(self, notif_settings=None):
+        """One-time FYI to later signers when this school's first request goes out.
+
+        Called from send_notification after the first pending send succeeds.
+        Skips the current signer, anyone already asked to sign, and college
+        staff when that setting is off. Does not include a signing URL.
+        """
+        from .settings.helpers import (
+            heads_up_email_enabled,
+            heads_up_include_college,
+            notification_recipients,
+        )
+
+        cfg = notif_settings if notif_settings is not None else configs.from_db()
+        if not heads_up_email_enabled(cfg):
+            return
+        body_raw = (cfg.get('heads_up_email_message') or '').strip()
+        subject = (cfg.get('heads_up_email_subject') or '').strip()
+        if not body_raw or not subject:
+            return
+
+        include_college = heads_up_include_college(cfg)
+        later = MOUSignature.objects.filter(
+            highschool=self.highschool,
+            signator_template__mou=self.signator_template.mou,
+            signator_template__weight__gt=self.signator_template.weight,
+        ).exclude(
+            pk=self.pk,
+        ).exclude(
+            status='signed',
+        ).select_related(
+            'signator',
+            'signator_template',
+            'signator_template__mou',
+            'signator_template__mou__academic_year',
+            'highschool',
+        )
+
+        academic_year = ''
+        mou = self.signator_template.mou
+        if mou.academic_year_id:
+            academic_year = str(mou.academic_year)
+
+        for signature in later:
+            if signature.status in (
+                MOUSignature.STATUS_PENDING,
+                MOUSignature.STATUS_CHANGES_REQUESTED,
+            ):
+                continue
+            if not include_college and signature.signator_template.role_type == 'college_admin':
+                continue
+            meta = signature.meta or {}
+            if meta.get('heads_up_sent'):
+                continue
+
+            to = notification_recipients([signature.signator.email], cfg)
+            if not to:
+                continue
+
+            role = 'N/A'
+            if meta.get('role'):
+                role = meta['role']
+            elif signature.signator_template:
+                role = signature.signator_template.sexy_role or 'N/A'
+
+            # No signature_url here on purpose — this is a heads-up, not a request.
+            context = Context({
+                'highschool_name': signature.highschool.name,
+                'signator_firstname': signature.signator.first_name,
+                'signator_lastname': signature.signator.last_name,
+                'mou_title': signature.mou_title,
+                'role': role,
+                'academic_year': academic_year,
+            })
+            text_body = Template(body_raw).render(context)
+            html_body = get_template('cis/email.html').render({'message': text_body})
+            send_html_mail(
+                Template(subject).render(context),
+                text_body,
+                html_body,
+                settings.DEFAULT_FROM_EMAIL,
+                to,
+            )
+            meta['heads_up_sent'] = True
+            signature.meta = meta
+            signature.save(update_fields=['meta'])
+
     def send_change_request_notification(self):
+        from .settings.helpers import notification_recipients, notify_address_list
+
         notif_settings = configs.from_db()
 
         subject = notif_settings.get('change_request_email_subject', 'MOU Change Request')
@@ -540,19 +722,13 @@ class MOUSignature(models.Model):
 
         mou = self.signator_template.mou
         if mou.manager and mou.manager.email:
-            to = [mou.manager.email]
+            intended = [mou.manager.email]
         else:
-            fallback = notif_settings.get('notify_address') or ''
-            to = [addr.strip() for addr in fallback.split(',') if addr.strip()]
+            intended = notify_address_list(notif_settings)
 
+        to = notification_recipients(intended, notif_settings)
         if not to:
             return
-
-        if getattr(settings, 'DEBUG', True):
-            fallback = notif_settings.get('notify_address') or ''
-            debug_to = [addr.strip() for addr in fallback.split(',') if addr.strip()]
-            if debug_to:
-                to = debug_to
 
         context = Context({
             'highschool_name': self.highschool.name,
@@ -584,6 +760,31 @@ class MOUSignature(models.Model):
     def mark_as_pending(self):
         self.status = 'pending'
         self.save()
+
+    def mark_as_next(self):
+        self.status = self.STATUS_NEXT
+        self.save()
+
+    def mark_pending_from_signature_link(self):
+        """Get Signature Link asks this person to sign without sending mail.
+
+        Only the current Next Up row flips to pending so later steps cannot
+        skip the chain. Does not increment notification_count, so a later
+        Send Signature Link still uses the first please-sign copy.
+        """
+        if self.status in ('signed', self.STATUS_CHANGES_REQUESTED, self.STATUS_PENDING):
+            return False
+        if self.status != self.STATUS_NEXT and not self.is_next_in_chain():
+            return False
+        meta = dict(self.meta or {})
+        if not meta.get('notified_on'):
+            meta['notified_on'] = timezone.localtime(timezone.now()).strftime(
+                '%m/%d/%Y %I:%M %p'
+            )
+        self.meta = meta
+        self.status = self.STATUS_PENDING
+        self.save(update_fields=['status', 'meta'])
+        return True
     
     def mark_as_signed(self, commit=True):
         self.status = 'signed'
@@ -649,6 +850,39 @@ class MOUSignature(models.Model):
 
         return render_to_string(template, {
             'teachers': teacher_certs
+        })
+
+    @property
+    def approved_course_list(self):
+        """Distinct certified courses for this school, same status filter as teacher_list.
+
+        Workbook 4.2/4.3: SCCC wants approved courses, not next-year projections
+        ({{course_list}} / {{future_course_list}}).
+        """
+        from cis.models.teacher import TeacherCourseCertificate
+        from .settings.email_settings import email_settings as configurator
+
+        configs = configurator.from_db()
+
+        teacher_certs = TeacherCourseCertificate.objects.filter(
+            teacher_highschool__highschool=self.highschool
+        )
+        if configs.get('teacher_course_status'):
+            teacher_certs = teacher_certs.filter(
+                status__in=configs.get('teacher_course_status')
+            )
+
+        courses = []
+        seen = set()
+        for cert in teacher_certs.select_related('course').order_by('course__name'):
+            course = cert.course
+            if not course or course.id in seen:
+                continue
+            seen.add(course.id)
+            courses.append(course)
+
+        return render_to_string('mou/templates/approved_course_list.html', {
+            'courses': courses,
         })
     
     @property
@@ -897,23 +1131,35 @@ class MOUSignature(models.Model):
         # Shortcodes whose values are HTML and must not be auto-escaped by the
         # Django template engine when rendered into mou_text.
         HTML_SHORTCODES = {
-            'signature_1', 'signature_2', 'signature_3', 'signature_4',
             'teacher_list', 'choice_teacher_list', 'pathways_teacher_list',
             'pathways_course_list', 'choice_course_list',
             'facilitator_course_list', 'course_list', 'future_course_list',
+            'approved_course_list',
         }
+        from .settings.helpers import get_max_signator_weight
+        max_weight = get_max_signator_weight(cfg)
+        for i in range(1, max_weight + 1):
+            HTML_SHORTCODES.add(f'signature_{i}')
+
+        district = getattr(self.highschool, 'district', None)
+
+        def _district_attr(name):
+            if not district:
+                return ''
+            return getattr(district, name, None) or ''
 
         full_values = {
-            'signature_1':             self.signature_asHTML(1),
-            'signature_2':             self.signature_asHTML(2),
-            'signature_3':             self.signature_asHTML(3),
-            'signature_4':             self.signature_asHTML(4),
             'highschool_name':         self.highschool.name,
             'highschool_ceeb':         self.highschool.code,
             'highschool_address1':     self.highschool.address1 or '',
             'highschool_city':         self.highschool.city or '',
             'highschool_state':        self.highschool.state or '',
             'highschool_zip':          self.highschool.postal_code or '',
+            'district_name':           _district_attr('name'),
+            'district_address1':       _district_attr('address1'),
+            'district_city':           _district_attr('city'),
+            'district_state':          _district_attr('state') or _district_attr('state_code'),
+            'district_zip':            _district_attr('postal_code'),
             'academic_year':           self.signator_template.mou.academic_year.name,
             'teacher_list':            self.teacher_list,
             'choice_teacher_list':     self.choice_teacher_list,
@@ -923,7 +1169,10 @@ class MOUSignature(models.Model):
             'facilitator_course_list': self.facilitator_course_list,
             'course_list':             self.course_list,
             'future_course_list':      self.future_course_list,
+            'approved_course_list':    self.approved_course_list,
         }
+        for i in range(1, max_weight + 1):
+            full_values[f'signature_{i}'] = self.signature_asHTML(i)
 
         def _resolve(key, value):
             if key in choice_keys and key not in allowed:
@@ -961,23 +1210,31 @@ class MOUSignature(models.Model):
         })
 
 
-    def next_signator(self):
-        
-        next_signator = MOUSignature.objects.filter(
+    def is_next_in_chain(self):
+        """True when every earlier signer at this school has already signed."""
+        earlier = MOUSignature.objects.filter(
             highschool=self.highschool,
             signator_template__mou=self.signator_template.mou,
-            signator_template__weight__gt=self.signator_template.weight
-        )
+            signator_template__weight__lt=self.signator_template.weight,
+        ).exclude(status='signed')
+        return not earlier.exists()
 
-        if next_signator.exists():
-            next_signator = next_signator[0]
-
-            if next_signator.status == '':
-                next_signator.mark_as_pending()
-
-                return next_signator
-        else:
-            return None
+    def next_signator(self):
+        """Promote the next unsigned row to Next Up. Does not email —
+        pending is set when send_notification succeeds.
+        """
+        nxt = MOUSignature.objects.filter(
+            highschool=self.highschool,
+            signator_template__mou=self.signator_template.mou,
+            signator_template__weight__gt=self.signator_template.weight,
+        ).exclude(
+            status='signed',
+        ).order_by(
+            'signator_template__weight',
+        ).first()
+        if nxt and nxt.status in ('', None):
+            nxt.mark_as_next()
+        return nxt
 
     @property
     def signature_url(self):

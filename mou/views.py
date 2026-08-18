@@ -72,7 +72,11 @@ class MOUSignatureViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = MOUSignatureSerializer
 
     def get_queryset(self):
-        records = MOUSignature.objects.all()
+        # School then signing order so the CE table matches the chain (1 first).
+        records = MOUSignature.objects.all().order_by(
+            'highschool__name',
+            'signator_template__weight',
+        )
 
         mou_id = self.request.GET.get('mou_id')
         if mou_id:
@@ -196,7 +200,16 @@ def sign_mou(request, signature_id):
     change_request_form = MOURequestChangesForm(record=signature)
 
     if request.method == 'POST':
+        from .settings.helpers import allow_change_requests
         if request.POST.get('action') == 'request_changes':
+            if not allow_change_requests():
+                messages.add_message(
+                    request,
+                    messages.ERROR,
+                    'Change requests are not enabled for this agreement.',
+                    'list-group-item-danger',
+                )
+                return redirect('mou:sign', signature_id=signature_id)
             change_request_form = MOURequestChangesForm(
                 record=signature,
                 data=request.POST,
@@ -237,13 +250,17 @@ def sign_mou(request, signature_id):
                 )
 
     from .settings.email_settings import email_settings as configurator
+    from .settings.helpers import pdf_download_mode, allow_change_requests
 
+    cfg = configurator.from_db()
     context = {
         'record': signature,
         'form': form,
         'change_request_form': change_request_form,
         'page_title': f'{signature.mou_title} - {signature.signator}',
-        'custom_css': configurator.from_db().get('custom_css', ''),
+        'custom_css': cfg.get('custom_css', ''),
+        'pdf_download': pdf_download_mode(cfg),
+        'allow_change_requests': allow_change_requests(cfg),
     }
 
     return render(request, template, context)
@@ -332,11 +349,29 @@ def add_highschools(request):
 
         if form.is_valid():
             status = form.save()
+            misses = status.get('_misses') or []
+            policy = status.get('_policy')
+            if misses:
+                lines = '; '.join(
+                    f"{m['highschool']}: {m['role']} (step {m['weight']})"
+                    for m in misses
+                )
+                if policy == 'hold_school':
+                    message = (
+                        'Some schools were not added because a required title is empty: '
+                        + lines
+                    )
+                else:
+                    message = (
+                        'Schools added. Empty titles were skipped: ' + lines
+                    )
+            else:
+                message = 'Successfully processed request'
 
             data = {
-                'status':'success',
-                'message':'Successfully processed request',
-                'action': 'reload_table'
+                'status': 'success',
+                'message': message,
+                'action': 'reload_table',
             }
             return JsonResponse(data)
         else:
@@ -507,6 +542,9 @@ def get_signature_link(request):
     links = []
     for id in ids:
         signature = MOUSignature.objects.get(pk=id)
+        # Copying the link is how CE asks them to sign without waiting
+        # for the email job — flip Next Up to pending so the pad appears.
+        signature.mark_pending_from_signature_link()
         links.append(
             f'{signature.signator} - {signature.signature_url}'
         )
@@ -526,7 +564,19 @@ def send_signature_link(request):
     links = []
     for id in ids:
         signature = MOUSignature.objects.get(pk=id)
-        if signature.status == MOUSignature.STATUS_PENDING:
+        # Pending already means they were emailed (reminders). Blank means
+        # not yet asked — only send if they are next in the chain.
+        can_send = (
+            signature.status in (
+                MOUSignature.STATUS_PENDING,
+                MOUSignature.STATUS_NEXT,
+            )
+            or (
+                signature.status in ('', None)
+                and signature.is_next_in_chain()
+            )
+        )
+        if can_send:
             signature.send_notification()
 
             links.append(f'{signature.signator.first_name} {signature.signator.last_name} - ({signature.signator.email})')
@@ -665,6 +715,7 @@ def mou(request, record_id):
             # 'recipient_form': recipient_form,
             'record': record,
             'signator': signator,
+            'change_requests': list(record.open_change_requests()),
             'detail_actions': mou_actions.for_scope('detail', request.user),
             }
         )

@@ -239,6 +239,14 @@
                     <li class="nav-item">
                         <a class="nav-link" data-toggle="tab" href="#manage_signatures">Manage Signature(s)</a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-toggle="tab" href="#change_requests">
+                            Change Request(s)
+                            {% if change_requests %}
+                            <span class="badge badge-warning">{{ change_requests|length }}</span>
+                            {% endif %}
+                        </a>
+                    </li>
                     <li class="nav-item d-none">
                         <a class="nav-link" data-toggle="tab" href="#send_log">Send Log(s)</a>
                     </li>
@@ -262,7 +270,7 @@
                                                 </th>
                                                 <th data-data="signator.last_name" data-name="signator.last_name">Signator
                                                 </th>
-                                                <th data-data="signator_template.weight" data-name="signator_template.weight">Weight
+                                                <th data-data="signator_template.weight" data-name="signator_template.weight">Order
                                                 </th>
                                                 <th data-data="role" data-name="role">Role
                                                 </th>
@@ -279,6 +287,54 @@
                         </div>
                     </div>
                     
+                    <div class="tab-pane" id="change_requests">
+                        <div class="card border-top-0">
+                            <div class="card-body">
+                                <h5 class="card-title">Change Request(s)</h5>
+                                <p class="text-muted">
+                                    Signers asked for edits before signing. Update the MOU text if needed,
+                                    then on Manage Signature(s) use Change Status to set the row back to
+                                    Pending Signature so they can sign.
+                                </p>
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>School</th>
+                                            <th>Signer</th>
+                                            <th>Role</th>
+                                            <th>Requested</th>
+                                            <th>Comment</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for req in change_requests %}
+                                        <tr>
+                                            <td>{{ req.highschool.name }}</td>
+                                            <td>
+                                                {{ req.signator.last_name }}, {{ req.signator.first_name }}
+                                                {% if req.signator.email %}
+                                                <br><small class="text-muted">{{ req.signator.email }}</small>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ req.role }}</td>
+                                            <td>{{ req.change_requested_on|default:"—" }}</td>
+                                            <td>{{ req.change_request_comment }}</td>
+                                            <td>
+                                                <a class="btn btn-sm btn-primary" href="{{ req.signature_url }}" target="_blank">Open signer page</a>
+                                            </td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="6"><em>No open change requests.</em></td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="tab-pane" id="manage_signators">
                         <div class="card border-top-0">
                             <div class="card-body">
@@ -287,13 +343,13 @@
                                 </h5>
 
                                 <div>
-                                    <p class="alert alert-info">Please view the Settings if you need to add internal or college administrators as signators.</p>
+                                    <p class="alert alert-info">Add college staff here by choosing College Administrator, then selecting the person and their title. School and district signers are matched by title at each school.</p>
                                     <table id="table_signators" class="table table-striped" style="width:100%"
                                     data-server-side="true" data-ajax="{{signators_api}}">
                                         <thead>
                                             <tr>
                                                 <th></th>
-                                                <th data-data="weight" data-name="weight">Weight
+                                                <th data-data="weight" data-name="weight">Order
                                                 </th>
                                                 <!-- <th data-data="role_type" data-name="role_type">Role Type
                                                 </th> -->
@@ -614,7 +670,8 @@
                                                     }
                                                 },
                                             ],
-                                    order: [[1, 'asc']],
+                                    // School, then signing order (1 first). Column 1 is School; 3 is Order.
+                                    order: [[1, 'asc'], [3, 'asc']],
                                     'columns': [
                                         {
                                             'searchable': false,
@@ -637,6 +694,10 @@
                                         {
                                             'render': function (data, type, row, meta) {
                                                 let col = row.sexy_status
+                                                // notified_on_display is always-serialized; do not
+                                                // require row.status (this column is sexy_status).
+                                                if (row.notified_on_display)
+                                                    col += "<br><small>Sent " + row.notified_on_display + "</small>"
 
                                                 if(row.is_signed)
                                                     col += "<br><small><a href='" + row.mou_pdf_url + "'>Download PDF</a>"

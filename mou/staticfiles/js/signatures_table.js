@@ -74,9 +74,13 @@
           var pretty = row.sexy_status || row.status || '—';
           var cls = 'badge-secondary';
           if (s === 'signed')  cls = 'badge-success';
+          if (s === 'next')    cls = 'badge-info';
           if (s === 'pending') cls = 'badge-warning';
           if (s === 'declined' || s === 'failed') cls = 'badge-danger';
           var html = '<span class="badge ' + cls + '">' + pretty + '</span>';
+          if (row.notified_on_display) {
+            html += '<br><small class="text-muted">Sent ' + row.notified_on_display + '</small>';
+          }
           // For signed rows, expose a PDF download link directly under the badge.
           // mou_pdf_url + is_signed are emitted by MOUSignatureSerializer
           // (datatables_always_serialize).

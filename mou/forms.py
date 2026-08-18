@@ -84,7 +84,7 @@ class MOUFinalizeForm(forms.Form):
         queryset=None,
         label='MOU Manager',
         required=False,
-        help_text='Primary contact for change-request notifications. Falls back to the global Notification List if blank.',
+        help_text='Who is emailed when a signer requests changes. If this is blank, the notification list is used instead.',
     )
 
     def __init__(self, request, record=None, *args, **kwargs):
@@ -116,6 +116,14 @@ class MOUFinalizeForm(forms.Form):
             self.fields['send_until'].initial = record.send_until.strftime('%m/%d/%Y')
 
         self.fields['cron'].initial = record.cron
+        if not record.cron:
+            from .settings.helpers import mou_cfg
+            cfg = mou_cfg()
+            if cfg.get('default_cron'):
+                self.fields['cron'].initial = cfg.get('default_cron')
+
+        if not record.send_on_after or not record.send_until:
+            self._prefill_default_send_window(record)
 
         self.fields['manager'].queryset = CustomUser.objects.filter(
             groups__name='ce'
@@ -133,6 +141,21 @@ class MOUFinalizeForm(forms.Form):
             self.helper.form_action = reverse_lazy(
                 'memo:memo', args=[record.id]
             )
+
+    def _prefill_default_send_window(self, record):
+        """Apply default MM/DD from settings using the current year.
+
+        Only fills blanks so an already-scheduled MOU is not rewritten.
+        """
+        from .settings.helpers import mou_cfg
+        cfg = mou_cfg()
+        year = datetime.datetime.now().year
+        if not record.send_on_after and cfg.get('default_send_after_mmdd'):
+            mmdd = cfg.get('default_send_after_mmdd').strip()
+            self.fields['send_after'].initial = f'{mmdd}/{year}' if '/' in mmdd and mmdd.count('/') == 1 else mmdd
+        if not record.send_until and cfg.get('default_send_until_mmdd'):
+            mmdd = cfg.get('default_send_until_mmdd').strip()
+            self.fields['send_until'].initial = f'{mmdd}/{year}' if '/' in mmdd and mmdd.count('/') == 1 else mmdd
 
     def clean_status(self):
         if self.record.status == 'sent':
@@ -310,9 +333,25 @@ class MOUSignatorForm(forms.Form):
         label='District Admin Role'
     )
 
+    college_user = forms.ModelChoiceField(
+        queryset=None,
+        required=False,
+        label='College Signer',
+        help_text='The college staff member who signs this step on every school’s copy.',
+        widget=forms.Select(attrs={'class': 'col-md-8 col-sm-12'}),
+    )
+
+    college_title = forms.CharField(
+        max_length=200,
+        required=False,
+        label='College Signer Title',
+        help_text='Shown next to their signature (for example, Vice President for Academic Affairs).',
+    )
+
     weight = forms.ChoiceField(
-        choices=[('','Select')] + [(i, i)for i in range(1,5)],
-        help_text='Lower weight is required to sign first. If choosing College Administrator, please select 3 or 4',
+        choices=[('', 'Select')],
+        label='Signing order',
+        help_text='1 signs first, then 2, and so on.',
     )
 
     complete_extra_form = forms.ChoiceField(
@@ -339,6 +378,19 @@ class MOUSignatorForm(forms.Form):
             (pos.id, pos.name) for pos in DistrictPosition.objects.all().order_by('name')
         )
 
+        staff = CustomUser.objects.filter(
+            is_active=True,
+            is_staff=True,
+        ).order_by('last_name')
+        self.fields['college_user'].queryset = staff
+
+        from .settings.helpers import get_max_signator_weight
+        max_weight = get_max_signator_weight()
+        self.fields['weight'].choices = [('', 'Select')] + [(i, i) for i in range(1, max_weight + 1)]
+        self.fields['weight'].help_text = (
+            f'1 signs first, then 2, and so on. You can use 1 through {max_weight}.'
+        )
+
         self.fields['mou_id'].initial = mou_id
         
         if record:
@@ -348,6 +400,8 @@ class MOUSignatorForm(forms.Form):
             self.fields['role_type'].initial = record.role_type
             self.fields['highschool_admin_role'].initial = record.role
             self.fields['district_admin_role'].initial = record.role
+            self.fields['college_user'].initial = record.college_user_id
+            self.fields['college_title'].initial = record.title
 
             self.fields['complete_extra_form'].initial = record.meta.get('complete_extra_form')
         else:
@@ -357,13 +411,23 @@ class MOUSignatorForm(forms.Form):
         weight = self.cleaned_data.get('weight')
 
         if weight == '':
-            raise ValidationError('Please select a weight')
+            raise ValidationError('Please choose a signing order')
 
+        from .settings.helpers import college_admin_any_weight_allowed
         if self.cleaned_data.get('role_type') == 'college_admin':
-            if int(weight) < 3:
-                raise ValidationError('College Administrator must be 3 or 4')
+            if not college_admin_any_weight_allowed() and int(weight) < 3:
+                raise ValidationError(
+                    'College staff can only be placed at steps 3 or 4. '
+                    'Turn on “College staff can sign at any step” in MOU settings to allow other positions.'
+                )
             
         return weight
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get('role_type') == 'college_admin' and not cleaned.get('college_user'):
+            self.add_error('college_user', 'Select the college staff member who will sign this step.')
+        return cleaned
     
     def save(self, request, mou, commit=True):
         data = self.cleaned_data
@@ -378,10 +442,17 @@ class MOUSignatorForm(forms.Form):
 
         if data.get('role_type') == 'highschool_admin':
             record.role = data.get('highschool_admin_role')
+            record.college_user = None
+            record.title = ''
         elif data.get('role_type') == 'district_admin':
             record.role = data.get('district_admin_role')
+            record.college_user = None
+            record.title = ''
         elif data.get('role_type') == 'college_admin':
-            record.role = uuid.uuid4()
+            if data.get('id') == '-1':
+                record.role = uuid.uuid4()
+            record.college_user = data.get('college_user')
+            record.title = data.get('college_title') or ''
 
         record.meta['complete_extra_form'] = data.get('complete_extra_form')
 
@@ -861,92 +932,152 @@ class AddHighSchoolForm(forms.Form):
 
         self.fields['action'].initial = kwargs.get('action', 'add_highschools')
         self.fields['mou_id'].initial = mou_id
+
+    def _resolve_college_user(self, signator, email_settings):
+        """Prefer the user stored on the signator; fall back to legacy weight 3/4 settings."""
+        if signator.college_user_id:
+            return signator.college_user
+        weight = signator.weight
+        user_id = None
+        if weight == 3:
+            user_id = email_settings.get('college_administrator_1')
+        elif weight == 4:
+            user_id = email_settings.get('college_administrator_2')
+        if not user_id:
+            return None
+        return CustomUser.objects.filter(id=user_id).first()
+
+    def _notify_vacant_roles(self, mou, misses):
+        from django.template.loader import get_template
+        from mailer import send_html_mail
+        from .settings.helpers import notification_recipients, notify_address_list
+        from .settings.email_settings import email_settings as mou_settings
+
+        cfg = mou_settings.from_db()
+        intended = []
+        if mou.manager and mou.manager.email:
+            intended.append(mou.manager.email)
+        intended.extend(notify_address_list(cfg))
+        # Deduplicate while preserving order
+        seen = set()
+        intended = [a for a in intended if not (a in seen or seen.add(a))]
+        to = notification_recipients(intended, cfg)
+        if not to:
+            return
+
+        lines = []
+        for miss in misses:
+            lines.append(
+                f"{miss['highschool']} — {miss['role']} (step {miss['weight']})"
+            )
+        body = (
+            f"<p>These required titles were empty when schools were added to "
+            f"<strong>{mou.title}</strong>:</p><ul>"
+            + ''.join(f"<li>{line}</li>" for line in lines)
+            + "</ul>"
+        )
+        html_body = get_template('cis/email.html').render({'message': body})
+        send_html_mail(
+            f'MOU missing signer — {mou.title}',
+            '\n'.join(lines),
+            html_body,
+            settings.DEFAULT_FROM_EMAIL,
+            to,
+        )
         
     def save(self, request=None):
         from cis.models.highschool_administrator import HSAdministratorPosition
         from cis.models.district import DistrictAdministratorPosition
-        data = self.cleaned_data
+        from .settings.email_settings import email_settings as mou_settings
+        from .settings.helpers import vacant_role_policy
 
+        data = self.cleaned_data
         mou = MOU.objects.get(pk=data.get('mou_id'))
-        
-        signators = MOUSignator.objects.filter(
-            mou=mou
-        ).order_by('weight')
+        cfg = mou_settings.from_db()
+        policy = vacant_role_policy(cfg)
+
+        signators = MOUSignator.objects.filter(mou=mou).order_by('weight')
 
         result = {}
+        misses = []
         for highschool in data.get('highschools'):
-            result[highschool.code] = {
-                'signator': []
-            }
+            result[highschool.code] = {'signator': []}
+            resolved = []
+            school_misses = []
 
             for signator in signators:
-                admin_positions = None
+                signee = None
+                role = signator.sexy_role
 
                 if signator.role_type == 'highschool_admin':
-                    # get the active person 
                     admin_positions = HSAdministratorPosition.objects.filter(
                         position__id=signator.role,
                         highschool=highschool,
                         status__iexact='active'
                     )
+                    if admin_positions:
+                        signee = admin_positions[0].hsadmin.user
+                        role = admin_positions[0].position.name
                 elif signator.role_type == 'district_admin':
                     admin_positions = DistrictAdministratorPosition.objects.filter(
                         position__id=signator.role,
                         district=highschool.district,
                         status__iexact='active'
                     )
+                    if admin_positions:
+                        # cis names this district_admin; older copies used hsadmin.
+                        holder = admin_positions[0]
+                        admin_obj = getattr(holder, 'district_admin', None) or getattr(holder, 'hsadmin', None)
+                        signee = admin_obj.user if admin_obj else None
+                        role = holder.position.name
                 elif signator.role_type == 'college_admin':
-                    weight = signator.weight
+                    signee = self._resolve_college_user(signator, cfg)
+                    role = signator.title or 'College Administrator'
 
-                    # add college administrators if listed in Settings
-                    from .settings.email_settings import email_settings as mou_settings
-                    email_settings = mou_settings.from_db()
-                    if weight == 3:
-                        admin_positions = CustomUser.objects.filter(
-                            id=email_settings.get('college_administrator_1', 1)
-                        )
-                    elif weight == 4:
-                        admin_positions = CustomUser.objects.filter(
-                            id=email_settings.get('college_administrator_2', 1)
-                        )
-                    print(admin_positions, type(admin_positions))
-
-                if not admin_positions:
+                if not signee:
+                    school_misses.append({
+                        'highschool': highschool.name,
+                        'role': role,
+                        'weight': signator.weight,
+                        'role_type': signator.role_type,
+                    })
                     result[highschool.code]['signator'].append({
                         signator.role_type: f'Not found for {signator.weight}'
                     })
                 else:
-                    if signator.role_type in ['highschool_admin', 'district_admin']:
-                        signee = admin_positions[0].hsadmin.user
-                        role = admin_positions[0].position.name
-                    else:
-                        signee = admin_positions[0]
-                        role = 'College Administrator'
+                    resolved.append((signator, signee, role))
 
-                    print(f'Adding {signator.weight} {signator.role_type} {signee} to {highschool.name}')
-                    if MOUSignature.objects.filter(
+            if school_misses and policy == 'hold_school':
+                misses.extend(school_misses)
+                result[highschool.code]['held'] = True
+                continue
+
+            misses.extend(school_misses)
+
+            for signator, signee, role in resolved:
+                if MOUSignature.objects.filter(
+                    highschool=highschool,
+                    signator=signee,
+                    signator_template=signator
+                ).exists():
+                    result[highschool.code]['signator'].append({
+                        signator.role_type: str(signee) + ' exists'
+                    })
+                else:
+                    MOUSignature.objects.create(
                         highschool=highschool,
                         signator=signee,
-                        signator_template=signator
-                    ).exists():
-                        result[highschool.code]['signator'].append({
-                            signator.role_type: str(signee) + ' exists'
-                        })
-                    else:
-                        signature = MOUSignature(
-                            highschool=highschool,
-                            signator=signee,
-                            signator_template=signator,
-                            status='',
-                            meta={
-                                'role': role,
-                            }
-                        )
-
-                        signature.save()
-                        result[highschool.code]['signator'].append({
-                            signator.role_type: str(signee) + ' added'
-                        })
+                        signator_template=signator,
+                        status='',
+                        meta={'role': role},
+                    )
+                    result[highschool.code]['signator'].append({
+                        signator.role_type: str(signee) + ' added'
+                    })
 
         mou.initialize_signature_status()
+        if misses and policy == 'skip_and_notify':
+            self._notify_vacant_roles(mou, misses)
+        result['_misses'] = misses
+        result['_policy'] = policy
         return result

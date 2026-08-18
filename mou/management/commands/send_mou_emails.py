@@ -56,15 +56,12 @@ class Command(BaseCommand):
         signatures_emailed = 0
         for mou in ready_mous:
             if mou.should_message_be_sent(now=now):
-                pending_signatures = MOUSignature.objects.filter(
-                    status='pending',
-                    signator_template__mou=mou,
-                )
-                count = pending_signatures.count()
+                due = mou.current_unsigned_signatures()
+                count = due.count()
 
                 summary_detail[str(mou.id)] = f'Sending to {count}'
-                for pending_signature in pending_signatures:
-                    pending_signature.send_notification()
+                for signature in due:
+                    signature.send_notification()
 
                 if count:
                     mous_emailed += 1

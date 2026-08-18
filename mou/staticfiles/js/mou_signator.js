@@ -1,7 +1,7 @@
 $(function () {
 
     function clear_roles() {
-        $("#div_id_highschool_admin_role, #div_id_district_admin_role").hide()
+        $("#div_id_highschool_admin_role, #div_id_district_admin_role, #div_id_college_user, #div_id_college_title").hide()
         
         toggle_role($('#id_role_type'))
     }
@@ -10,12 +10,17 @@ $(function () {
         if($(element).val() == 'highschool_admin') {
             $("#div_id_highschool_admin_role").show()
             $("#div_id_district_admin_role").hide()
+            $("#div_id_college_user, #div_id_college_title").hide()
         } else if($(element).val() == 'district_admin') {
             $("#div_id_district_admin_role").show()
             $("#div_id_highschool_admin_role").hide()
+            $("#div_id_college_user, #div_id_college_title").hide()
         } else if($(element).val() == 'college_admin') {
             $("#div_id_highschool_admin_role").hide()
             $("#div_id_district_admin_role").hide()
+            $("#div_id_college_user, #div_id_college_title").show()
+        } else {
+            $("#div_id_highschool_admin_role, #div_id_district_admin_role, #div_id_college_user, #div_id_college_title").hide()
         }
     }
   
