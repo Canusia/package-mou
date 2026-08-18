@@ -1154,6 +1154,16 @@ class MOUSignature(models.Model):
         for i in range(1, max_weight + 1):
             HTML_SHORTCODES.add(f'signature_{i}')
 
+        # Signature blocks are structural, not optional content: a tenant does
+        # not "disable" signature_3 the way they might disable teacher_list.
+        # AVAILABLE_SHORTCODES is built at import from the DEFAULT constant
+        # while this set comes from the max_signator_weight setting, so any row
+        # saved before a chain-length change would otherwise blank the extra
+        # slots with no error and no UI hint.
+        signature_keys = {f'signature_{i}' for i in range(1, max_weight + 1)}
+        allowed = set(allowed) | signature_keys
+        choice_keys = set(choice_keys) - signature_keys
+
         district = getattr(self.highschool, 'district', None)
 
         def _district_attr(name):
