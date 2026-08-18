@@ -1,3 +1,5 @@
+import importlib.util
+
 from django.contrib.auth.models import Group
 from django.test import TestCase, Client, override_settings
 from django.urls import reverse
@@ -25,7 +27,13 @@ def _write_cfg(value):
         Setting.objects.update_or_create(key=key, defaults={'value': value})
 
 
-@override_settings(SESSION_COOKIE_SECURE=False, CSRF_COOKIE_SECURE=False)
+_PKG = 'mou.mou' if importlib.util.find_spec('mou.mou') else 'mou'
+
+
+@override_settings(
+    SESSION_COOKIE_SECURE=False, CSRF_COOKIE_SECURE=False,
+    ROOT_URLCONF=f'{_PKG}.tests.urls_hs',
+)
 class SignedMousHsAdminTests(TestCase):
     def setUp(self):
         MOU, MOUSignator, MOUSignature = _models()

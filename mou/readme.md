@@ -26,6 +26,7 @@ _mou = 'mou.mou' if importlib.util.find_spec('mou.mou') else 'mou'
 urlpatterns += [
     path('mou/', include(f'{_mou}.urls.mou')),
     path('ce/highschools/mous/', include(f'{_mou}.urls.ce')),
+    path('highschool_admin/mous/', include(f'{_mou}.urls.highschool_admin')),  # namespace: mou_hs
 ]
 ```
 
@@ -34,6 +35,16 @@ The CE prefix **must be `ce/highschools/mous/`** — `mou/views.py` and
 (`/ce/highschools/mous/api/mou_signators?…`,
 `/ce/highschools/mous/api/mou_signatures?…`) and the breadcrumb. Mounting
 elsewhere will produce 404s on the MOU detail page.
+
+## Host URL wiring
+
+This package ships three URLconfs and registers none of them; the host
+project includes the ones it wants. `mou/urls/__init__.py` is
+intentionally empty. Without the `mou.urls.highschool_admin` line above,
+the HS-admin "Signed MOUs" page is unreachable, and the
+`hs_admin_can_view_signed_mous` setting has no effect. This is true on
+every tenant today — `myce/urls.py` currently includes only
+`mou.urls.ce` and `mou.urls.mou`.
 
 ## 3. Add the staticfiles dir
 
