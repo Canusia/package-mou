@@ -786,20 +786,17 @@ class MOUSignature(models.Model):
 
         Only the current Next Up row flips to pending so later steps cannot
         skip the chain. Does not increment notification_count, so a later
-        Send Signature Link still uses the first please-sign copy.
+        Send Signature Link still uses the first please-sign copy, and does not
+        stamp `notified_on` -- that field means "we emailed them", and the
+        signatures table renders it as "Sent <date>". Copying a link is not a
+        send, and reporting one would be a false delivery record.
         """
         if self.status in ('signed', self.STATUS_CHANGES_REQUESTED, self.STATUS_PENDING):
             return False
         if self.status != self.STATUS_NEXT and not self.is_next_in_chain():
             return False
-        meta = dict(self.meta or {})
-        if not meta.get('notified_on'):
-            meta['notified_on'] = timezone.localtime(timezone.now()).strftime(
-                '%m/%d/%Y %I:%M %p'
-            )
-        self.meta = meta
         self.status = self.STATUS_PENDING
-        self.save(update_fields=['status', 'meta'])
+        self.save(update_fields=['status'])
         return True
     
     def mark_as_signed(self, commit=True):

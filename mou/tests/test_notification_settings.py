@@ -156,7 +156,8 @@ class ReminderEmailTests(TestCase):
         self.assertTrue(self.signature.mark_pending_from_signature_link())
         self.signature.refresh_from_db()
         self.assertEqual(self.signature.status, 'pending')
-        self.assertTrue(self.signature.meta.get('notified_on'))
+        # Copying a link is not a send, so it must not claim one happened.
+        self.assertFalse(self.signature.meta.get('notified_on'))
         self.assertFalse(self.signature.meta.get('notification_count'))
 
     def test_get_link_does_not_skip_ahead_in_chain(self):
