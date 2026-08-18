@@ -30,5 +30,6 @@ urlpatterns = [
     path('logout/', logout_view, name='logout'),
     path('ce/', include('cis.urls')),
     path('mou/', include(f'{_PKG}.urls.mou')),
+    path('ce/highschools/mous/', include(f'{_PKG}.urls.ce')),
     path('highschool_admin/mous/', include(f'{_PKG}.urls.highschool_admin')),
 ]

@@ -5,15 +5,16 @@ went to real signers -- and `install()` seeds it to "Debug". Promoting it to
 the master switch therefore flips every existing tenant to debug-only mail
 unless the stored value is migrated forward.
 """
-from django.test import SimpleTestCase, TestCase
+from django.test import SimpleTestCase, TestCase, override_settings
 
 from cis.models.settings import Setting
 
-from ..migrations._is_active import _is_active_keys, _set_live  # noqa: F401  (existence check)
+from ..migrations._is_active import _is_active_keys, _set_live
 from ..settings.email_settings import email_settings
 from ..settings.helpers import is_active_mode, notification_recipients
 
 
+@override_settings(DEBUG=False)
 class IsActiveModeTests(SimpleTestCase):
     def test_yes_sends_to_intended_recipients(self):
         cfg = {'is_active': 'Yes', 'notify_address': 'debug@example.com'}
@@ -70,3 +71,18 @@ class UpgradeMigrationTests(TestCase):
         Setting.objects.filter(key=email_settings.key).delete()
         self._run_forward()  # must not raise
         self.assertFalse(Setting.objects.filter(key=email_settings.key).exists())
+
+    def test_the_other_key_spelling_is_also_upgraded(self):
+        """Layout-neutrality: whichever spelling ``_is_active_keys()`` sees
+        must be updated, not just the one ``email_settings.key`` resolves to
+        under this test run's layout (flat vs. in-tree submodule)."""
+        other_key = next(
+            key for key in _is_active_keys() if key != email_settings.key
+        )
+        Setting.objects.update_or_create(
+            key=other_key,
+            defaults={'value': {'is_active': 'Debug', 'notify_address': 'd@e.com'}},
+        )
+        self._run_forward()
+        value = Setting.objects.get(key=other_key).value
+        self.assertEqual(value['is_active'], 'Yes')

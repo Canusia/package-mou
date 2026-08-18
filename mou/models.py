@@ -230,8 +230,10 @@ class MOU(models.Model):
         ).distinct(
             'highschool__name'
         )
-        # Materialised deliberately: DISTINCT ON cannot be composed with a
-        # further .exclude() in one queryset, and this is one row per school.
+        # Materialised deliberately: you cannot filter a queryset after
+        # DISTINCT ON in a single query (Postgres requires ORDER BY to lead
+        # with the DISTINCT ON columns, which a later .filter()/.exclude()
+        # would need to re-order around), and this is one row per school.
         blocked = MOUSignature.STATUS_CHANGES_REQUESTED
         ids = [sig.pk for sig in lowest_per_school if sig.status != blocked]
         return MOUSignature.objects.filter(pk__in=ids).order_by(
@@ -768,6 +770,22 @@ class MOUSignature(models.Model):
 
     def is_ready_to_be_signed(self):
         return True if self.status == 'pending' else False
+
+    def is_turn_to_act(self):
+        """True when it is genuinely this signer's turn.
+
+        Single source of truth for "is this row eligible for signer action
+        right now", shared by the sign_mou gate (sign / request_changes) and
+        send_signature_link, so the two cannot drift out of sync again. A
+        row must be in an "it is your turn" status (next/pending, i.e. it
+        has already been invited into the chain and has not signed or
+        requested changes) AND every earlier signer at this school must
+        already have signed (is_next_in_chain()).
+        """
+        return (
+            self.status in (self.STATUS_NEXT, self.STATUS_PENDING)
+            and self.is_next_in_chain()
+        )
     
     @property
     def is_signed(self):

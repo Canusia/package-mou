@@ -201,6 +201,25 @@ def sign_mou(request, signature_id):
 
     if request.method == 'POST':
         from .settings.helpers import allow_change_requests
+
+        # The chain is a server-side rule. The template hides the pad (and
+        # the change-request link) for anyone whose turn it is not, but
+        # signing URLs are emailed and long-lived, so an old link could
+        # otherwise be replayed to sign out of order, overwrite an existing
+        # signature, or -- via request_changes -- un-sign an already-signed
+        # row and freeze the school's chain. Both branches share this gate:
+        # it must genuinely be this signer's turn (is_next_in_chain()) and
+        # their row must be in an "it is your turn" status (next/pending).
+        # Signing additionally requires the row to actually be pending.
+        if not signature.is_turn_to_act():
+            messages.add_message(
+                request,
+                messages.ERROR,
+                'This agreement is not ready for your action yet.',
+                'list-group-item-danger',
+            )
+            return redirect('mou:sign', signature_id=signature_id)
+
         if request.POST.get('action') == 'request_changes':
             if not allow_change_requests():
                 messages.add_message(
@@ -231,11 +250,7 @@ def sign_mou(request, signature_id):
                     'list-group-item-danger',
                 )
         else:
-            # The chain is a server-side rule. The template hides the pad for
-            # anyone whose turn it is not, but signing URLs are emailed and
-            # long-lived, so an old link could otherwise be replayed to sign
-            # out of order or to overwrite an existing signature.
-            if not signature.is_ready_to_be_signed() or not signature.is_next_in_chain():
+            if not signature.is_ready_to_be_signed():
                 messages.add_message(
                     request,
                     messages.ERROR,
@@ -577,19 +592,9 @@ def send_signature_link(request):
     links = []
     for id in ids:
         signature = MOUSignature.objects.get(pk=id)
-        # Pending already means they were emailed (reminders). Blank means
-        # not yet asked — only send if they are next in the chain.
-        can_send = (
-            signature.status in (
-                MOUSignature.STATUS_PENDING,
-                MOUSignature.STATUS_NEXT,
-            )
-            or (
-                signature.status in ('', None)
-                and signature.is_next_in_chain()
-            )
-        )
-        if can_send:
+        # Same rule the sign_mou gate uses (is_turn_to_act) -- a link is
+        # never sent to a row the recipient couldn't actually act on.
+        if signature.is_turn_to_act():
             signature.send_notification()
 
             links.append(f'{signature.signator.first_name} {signature.signator.last_name} - ({signature.signator.email})')
