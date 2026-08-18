@@ -106,3 +106,36 @@ class CollegeSignatorTests(TestCase):
         self.assertEqual(int(saved.weight), 1)
         self.assertEqual(saved.college_user_id, self.vp.id)
         self.assertEqual(saved.title, 'Director of College and HS Partnerships')
+
+    def test_switching_to_college_admin_clears_a_stale_hs_role(self):
+        """record.role holds an HSPosition UUID for highschool_admin rows. The
+        college branch only assigned a fresh UUID for new rows (id == '-1'), so
+        an edited row kept the old position id -- a value that collides with a
+        real HSPosition for any future lookup that does not branch on
+        role_type first."""
+        from cis.models.highschool_administrator import HSPosition
+
+        MOU, MOUSignator, MOUSignatorForm, _ = _models()
+        pos = HSPosition.objects.create(name='Principal')
+        signator = MOUSignator.objects.create(
+            mou=self.mou, weight=1, role_type='highschool_admin',
+            role=pos.id, created_by=self.user, meta={},
+        )
+        original_role = signator.role
+        form = MOUSignatorForm(
+            record=signator,
+            mou_id=self.mou.id,
+            data={
+                'mou_id': str(self.mou.id),
+                'action': 'edit_mou_signator',
+                'id': str(signator.id),
+                'role_type': 'college_admin',
+                'college_user': self.vp.id,
+                'college_title': 'Provost',
+                'weight': '1',
+                'complete_extra_form': '2',
+            },
+        )
+        self.assertTrue(form.is_valid(), msg=form.errors)
+        saved = form.save(type('R', (), {'user': self.user})(), self.mou)
+        self.assertNotEqual(saved.role, original_role)

@@ -6,6 +6,7 @@ from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 
 from django.utils.safestring import mark_safe
+from django.utils.html import escape
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit
 
@@ -436,7 +437,9 @@ class MOUSignatorForm(forms.Form):
             record = MOUSignator(mou=mou, created_by=request.user, meta={})
         else:
             record = MOUSignator.objects.get(pk=data.get('id'))
-        
+
+        previous_role_type = record.role_type
+
         record.weight = data.get('weight')
         record.role_type = data.get('role_type')
 
@@ -449,7 +452,11 @@ class MOUSignatorForm(forms.Form):
             record.college_user = None
             record.title = ''
         elif data.get('role_type') == 'college_admin':
-            if data.get('id') == '-1':
+            # A college row's `role` is a placeholder, but an edited row that
+            # used to be a highschool_admin/district_admin still holds a real
+            # HSPosition/DistrictPosition UUID. Leaving it there means a
+            # college row whose `role` collides with a genuine position id.
+            if data.get('id') == '-1' or previous_role_type != 'college_admin':
                 record.role = uuid.uuid4()
             record.college_user = data.get('college_user')
             record.title = data.get('college_title') or ''
@@ -970,10 +977,12 @@ class AddHighSchoolForm(forms.Form):
             lines.append(
                 f"{miss['highschool']} — {miss['role']} (step {miss['weight']})"
             )
+        # School names and MOU titles are free text and land in an HTML body:
+        # an ampersand breaks the markup and a tag injects into it.
         body = (
             f"<p>These required titles were empty when schools were added to "
-            f"<strong>{mou.title}</strong>:</p><ul>"
-            + ''.join(f"<li>{line}</li>" for line in lines)
+            f"<strong>{escape(mou.title)}</strong>:</p><ul>"
+            + ''.join(f"<li>{escape(line)}</li>" for line in lines)
             + "</ul>"
         )
         html_body = get_template('cis/email.html').render({'message': body})

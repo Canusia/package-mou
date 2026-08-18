@@ -94,6 +94,48 @@ class AddHighSchoolsVacantRoleTests(TestCase):
         self.assertEqual(len(result['_misses']), 1)
         notify.assert_called_once()
 
+    @patch('mailer.send_html_mail')
+    @patch('django.template.loader.get_template')
+    def test_vacant_role_email_escapes_interpolated_values(self, mock_get_template, send):
+        """mou.title / highschool.name / role name go straight into an HTML
+        email body; markup in any of them breaks or injects into the
+        message.
+
+        cis/email.html's own {{message}} placeholder is autoescaped by
+        Django, which would mask a missing escape() in this app's own body
+        construction. Stub get_template().render() to hand back the raw
+        `message` context value so this test exercises what mou/forms.py
+        builds, not what the wrapping cis template does to it."""
+        _, _, _, AddHighSchoolForm = _models()
+        mock_get_template.return_value.render.side_effect = (
+            lambda ctx: ctx['message']
+        )
+        self.mou.title = 'Dual Credit <script>alert(1)</script>'
+        self.mou.save(update_fields=['title'])
+        self.hs.name = 'Smith & Jones HS'
+        self.hs.save(update_fields=['name'])
+
+        value = {
+            'vacant_role_policy': 'skip_and_notify',
+            'is_active': 'Yes',
+            'notify_address': 'ops@example.com',
+        }
+        for key in ('mou.mou.settings.email_settings', 'mou.settings.email_settings'):
+            Setting.objects.update_or_create(key=key, defaults={'value': value})
+        form = AddHighSchoolForm(mou_id=self.mou.id, data={
+            'action': 'add_highschools',
+            'mou_id': str(self.mou.id),
+            'highschools': [str(self.hs.id)],
+        })
+        self.assertTrue(form.is_valid(), msg=form.errors)
+
+        form.save()
+
+        self.assertTrue(send.called)
+        html_body = send.call_args.args[2]
+        self.assertNotIn('<script>', html_body)
+        self.assertIn('&amp;', html_body)
+
 
 class AddHighSchoolsMarksNextUpTests(TestCase):
     def test_filled_role_is_next_up_until_emailed(self):
