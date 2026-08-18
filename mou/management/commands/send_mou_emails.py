@@ -57,15 +57,22 @@ class Command(BaseCommand):
         for mou in ready_mous:
             if mou.should_message_be_sent(now=now):
                 due = mou.current_unsigned_signatures()
-                count = due.count()
-
-                summary_detail[str(mou.id)] = f'Sending to {count}'
+                # Count what actually went out. send_notification returns
+                # without sending when is_active is No, when there is no
+                # recipient, or when the row's status is not emailable, so a
+                # pre-count reports sends that never happened.
+                sent = 0
                 for signature in due:
                     signature.send_notification()
+                    signature.refresh_from_db(fields=['status'])
+                    if signature.status == MOUSignature.STATUS_PENDING:
+                        sent += 1
 
-                if count:
+                summary_detail[str(mou.id)] = f'Sent to {sent} of {due.count()} due'
+
+                if sent:
                     mous_emailed += 1
-                    signatures_emailed += count
+                    signatures_emailed += sent
             else:
                 summary_detail[str(mou.id)] = 'Not scheduled to be sent'
 
