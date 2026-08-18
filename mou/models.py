@@ -211,16 +211,32 @@ class MOU(models.Model):
         return count
 
     def current_unsigned_signatures(self):
-        """Lowest-order unsigned signer per school (first email or reminder)."""
-        return MOUSignature.objects.filter(
+        """The signer whose turn it is at each school, or nothing when blocked.
+
+        Only `signed` is excluded when finding each school's lowest-weight
+        outstanding row: excluding `changes_requested` too would let the search
+        skip *past* an open change request and promote a later signer, which
+        contradicts MOUSignature.is_next_in_chain() and let signers sign out of
+        order. A school whose lowest outstanding row is `changes_requested` is
+        blocked until CE resolves it, so it yields nothing at all.
+        """
+        lowest_per_school = MOUSignature.objects.filter(
             signator_template__mou=self,
         ).exclude(
-            status__in=['signed', 'changes_requested'],
+            status='signed',
         ).order_by(
             'highschool__name',
             'signator_template__weight',
         ).distinct(
             'highschool__name'
+        )
+        # Materialised deliberately: DISTINCT ON cannot be composed with a
+        # further .exclude() in one queryset, and this is one row per school.
+        blocked = MOUSignature.STATUS_CHANGES_REQUESTED
+        ids = [sig.pk for sig in lowest_per_school if sig.status != blocked]
+        return MOUSignature.objects.filter(pk__in=ids).order_by(
+            'highschool__name',
+            'signator_template__weight',
         )
 
     def open_change_requests(self):
