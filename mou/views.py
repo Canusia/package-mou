@@ -208,10 +208,13 @@ def sign_mou(request, signature_id):
         # otherwise be replayed to sign out of order, overwrite an existing
         # signature, or -- via request_changes -- un-sign an already-signed
         # row and freeze the school's chain. Both branches share this gate:
-        # it must genuinely be this signer's turn (is_next_in_chain()) and
-        # their row must be in an "it is your turn" status (next/pending).
-        # Signing additionally requires the row to actually be pending.
-        if not signature.is_turn_to_act():
+        # the row's chain position must genuinely allow signer action right
+        # now (may_be_asked_to_sign() -- not signed, not already diverted
+        # into changes_requested, and no earlier signer at this school still
+        # outstanding). Signing additionally requires the row to actually be
+        # pending (below) -- see may_be_asked_to_sign()'s docstring for why
+        # that extra check is NOT folded into a single shared predicate.
+        if not signature.may_be_asked_to_sign():
             messages.add_message(
                 request,
                 messages.ERROR,
@@ -592,9 +595,12 @@ def send_signature_link(request):
     links = []
     for id in ids:
         signature = MOUSignature.objects.get(pk=id)
-        # Same rule the sign_mou gate uses (is_turn_to_act) -- a link is
-        # never sent to a row the recipient couldn't actually act on.
-        if signature.is_turn_to_act():
+        # Sending is broader than signing: it also covers the first-ever
+        # send to a never-invited ('' / None) row, which is how CE manually
+        # kicks a school's chain off. may_be_asked_to_sign() is the same
+        # chain-position rule the sign_mou gate uses for this same purpose
+        # (see its docstring for why it is not further narrowed here).
+        if signature.may_be_asked_to_sign():
             signature.send_notification()
 
             links.append(f'{signature.signator.first_name} {signature.signator.last_name} - ({signature.signator.email})')

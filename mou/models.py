@@ -771,21 +771,33 @@ class MOUSignature(models.Model):
     def is_ready_to_be_signed(self):
         return True if self.status == 'pending' else False
 
-    def is_turn_to_act(self):
-        """True when it is genuinely this signer's turn.
+    def may_be_asked_to_sign(self):
+        """True when this row's chain position genuinely allows signer
+        action -- sending a link, or (paired with is_ready_to_be_signed())
+        signing, or requesting changes -- right now.
 
-        Single source of truth for "is this row eligible for signer action
-        right now", shared by the sign_mou gate (sign / request_changes) and
-        send_signature_link, so the two cannot drift out of sync again. A
-        row must be in an "it is your turn" status (next/pending, i.e. it
-        has already been invited into the chain and has not signed or
-        requested changes) AND every earlier signer at this school must
-        already have signed (is_next_in_chain()).
+        Deliberately broader than is_ready_to_be_signed(): also true for a
+        never-yet-invited ('' / None) or Next-Up ('next') row. Those are not
+        edge cases -- they are the *first* send (send_signature_link is how
+        CE manually kicks a school's chain off, before anyone has been
+        promoted to Next Up) and a signer flagging changes before being
+        formally asked. Only `signed` and `changes_requested` rows -- and a
+        row whose turn genuinely hasn't come (an earlier signer at this
+        school hasn't signed) -- are excluded.
+
+        Do NOT fold this back together with is_ready_to_be_signed() into one
+        "is_turn_to_act"-style predicate. Signing is stricter (status must
+        be exactly 'pending'); sending a link and requesting changes are
+        not. Collapsing them re-introduces the bug where send_signature_link
+        can no longer fire the first invite. Keep the two predicates
+        separate and compose them differently per call site:
+          - send_signature_link: may_be_asked_to_sign()
+          - request_changes:     may_be_asked_to_sign()
+          - sign:                may_be_asked_to_sign() and is_ready_to_be_signed()
         """
-        return (
-            self.status in (self.STATUS_NEXT, self.STATUS_PENDING)
-            and self.is_next_in_chain()
-        )
+        if self.status in (self.STATUS_CHANGES_REQUESTED, 'signed'):
+            return False
+        return self.is_next_in_chain()
     
     @property
     def is_signed(self):
