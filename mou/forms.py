@@ -6,7 +6,7 @@ from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 
 from django.utils.safestring import mark_safe
-from django.utils.html import escape
+from django.utils.html import format_html, format_html_join
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit
 
@@ -977,13 +977,23 @@ class AddHighSchoolForm(forms.Form):
             lines.append(
                 f"{miss['highschool']} — {miss['role']} (step {miss['weight']})"
             )
-        # School names and MOU titles are free text and land in an HTML body:
-        # an ampersand breaks the markup and a tag injects into it.
-        body = (
-            f"<p>These required titles were empty when schools were added to "
-            f"<strong>{escape(mou.title)}</strong>:</p><ul>"
-            + ''.join(f"<li>{escape(line)}</li>" for line in lines)
-            + "</ul>"
+        # School names, MOU titles and role names are free text. format_html
+        # escapes each interpolated argument exactly once and returns a
+        # SafeString, so cis/email.html's `{{message}}` (no |safe filter)
+        # won't re-escape it -- unlike a plain str built with f-strings and
+        # manual escape() calls, which the outer template escapes again.
+        items = format_html_join(
+            '',
+            '<li>{} — {} (step {})</li>',
+            (
+                (miss['highschool'], miss['role'], miss['weight'])
+                for miss in misses
+            ),
+        )
+        body = format_html(
+            '<p>These required titles were empty when schools were added to '
+            '<strong>{}</strong>:</p><ul>{}</ul>',
+            mou.title, items,
         )
         html_body = get_template('cis/email.html').render({'message': body})
         send_html_mail(

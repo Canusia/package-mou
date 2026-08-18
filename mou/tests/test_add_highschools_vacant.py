@@ -95,21 +95,18 @@ class AddHighSchoolsVacantRoleTests(TestCase):
         notify.assert_called_once()
 
     @patch('mailer.send_html_mail')
-    @patch('django.template.loader.get_template')
-    def test_vacant_role_email_escapes_interpolated_values(self, mock_get_template, send):
+    def test_vacant_role_email_escapes_interpolated_values(self, send):
         """mou.title / highschool.name / role name go straight into an HTML
-        email body; markup in any of them breaks or injects into the
-        message.
-
-        cis/email.html's own {{message}} placeholder is autoescaped by
-        Django, which would mask a missing escape() in this app's own body
-        construction. Stub get_template().render() to hand back the raw
-        `message` context value so this test exercises what mou/forms.py
-        builds, not what the wrapping cis template does to it."""
+        email body built with format_html/format_html_join, so they must be
+        escaped exactly once. cis/email.html's own {{message}} placeholder
+        has no |safe filter and autoescapes whatever it's handed -- a plain
+        str body would get escaped a second time there (or, if never escaped
+        at all, would render as literal markup / carry unescaped user text).
+        This exercises the real get_template('cis/email.html').render(...)
+        path so both failure modes are covered: double-escaped entities and
+        the body's own structural tags surviving as real markup rather than
+        escaped text."""
         _, _, _, AddHighSchoolForm = _models()
-        mock_get_template.return_value.render.side_effect = (
-            lambda ctx: ctx['message']
-        )
         self.mou.title = 'Dual Credit <script>alert(1)</script>'
         self.mou.save(update_fields=['title'])
         self.hs.name = 'Smith & Jones HS'
@@ -134,7 +131,15 @@ class AddHighSchoolsVacantRoleTests(TestCase):
         self.assertTrue(send.called)
         html_body = send.call_args.args[2]
         self.assertNotIn('<script>', html_body)
-        self.assertIn('&amp;', html_body)
+        # Escaped exactly once: '&' -> '&amp;', not double-escaped to
+        # '&amp;amp;'.
+        self.assertEqual(html_body.count('&amp;'), 1)
+        self.assertNotIn('&amp;amp;', html_body)
+        # The body's own markup survives as real tags, not escaped text.
+        self.assertIn('<p>', html_body)
+        self.assertIn('<li>', html_body)
+        self.assertNotIn('&lt;p&gt;', html_body)
+        self.assertNotIn('&lt;li&gt;', html_body)
 
 
 class AddHighSchoolsMarksNextUpTests(TestCase):
