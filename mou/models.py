@@ -958,11 +958,12 @@ class MOUSignature(models.Model):
     
     @property
     def pathways_course_list(self):
-        from cis.models.future_sections import FutureSection, FutureCourse
-        from cis.models.course import Course
-        from cis.settings.future_sections import future_sections as       configurator
+        import importlib.util
+        if importlib.util.find_spec('future_sections.future_sections'):
+            from future_sections.future_sections.models import FutureCourse
+        else:
+            from future_sections.models import FutureCourse
 
-        configs = configurator.from_db()
         future_sections = FutureCourse.objects.filter(
             teacher_course__teacher_highschool__highschool=self.highschool,
             academic_year=self.signator_template.mou.academic_year,
@@ -980,11 +981,12 @@ class MOUSignature(models.Model):
     
     @property
     def choice_course_list(self):
-        from cis.models.future_sections import FutureSection, FutureCourse
-        from cis.models.course import Course
-        from cis.settings.future_sections import future_sections as       configurator
+        import importlib.util
+        if importlib.util.find_spec('future_sections.future_sections'):
+            from future_sections.future_sections.models import FutureCourse
+        else:
+            from future_sections.models import FutureCourse
 
-        configs = configurator.from_db()
         future_sections = FutureCourse.objects.filter(
             teacher_course__teacher_highschool__highschool=self.highschool,
             academic_year=self.signator_template.mou.academic_year,
@@ -1002,11 +1004,12 @@ class MOUSignature(models.Model):
     
     @property
     def facilitator_course_list(self):
-        from cis.models.future_sections import FutureSection, FutureCourse
-        from cis.models.course import Course
-        from cis.settings.future_sections import future_sections as       configurator
+        import importlib.util
+        if importlib.util.find_spec('future_sections.future_sections'):
+            from future_sections.future_sections.models import FutureCourse
+        else:
+            from future_sections.models import FutureCourse
 
-        configs = configurator.from_db()
         future_sections = FutureCourse.objects.filter(
             teacher_course__teacher_highschool__highschool=self.highschool,
             academic_year=self.signator_template.mou.academic_year,
@@ -1024,8 +1027,11 @@ class MOUSignature(models.Model):
     
     @property
     def course_list(self):
-        from cis.models.future_sections import FutureSection, FutureCourse
-        from cis.models.course import Course
+        import importlib.util
+        if importlib.util.find_spec('future_sections.future_sections'):
+            from future_sections.future_sections.models import FutureCourse
+        else:
+            from future_sections.models import FutureCourse
 
         future_sections = FutureCourse.objects.filter(
             teacher_course__teacher_highschool__highschool=self.highschool,
