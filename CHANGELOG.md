@@ -3,7 +3,7 @@
 Releases are tagged on `Canusia/package-mou` and consumed by each tenant through the
 `git+https://…@<tag>` pin in `webapp/requirements.txt`.
 
-## v0.0.8 — 2026-08-18
+## v0.0.8 — 2026-08-19
 
 ### Added
 
