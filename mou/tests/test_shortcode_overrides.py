@@ -14,7 +14,7 @@ from unittest.mock import MagicMock, patch
 from django.test import TestCase
 
 from ..models import _tenant_mou_override
-from .factories import make_mou_with_chain
+from .factories import make_mou_with_chain, make_certificate, make_course
 
 # The package installs nested (in-tree submodule, mou.mou -- what ewu mounts)
 # or flat (pip-installed, mou). Resolve the render_to_string patch target the
@@ -277,6 +277,16 @@ class ApprovedCourseListOverrideTests(TestCase):
         self.assertIsInstance(seen['courses'], list)
 
     def test_dedup_still_happens_before_the_override_sees_it(self):
+        """With no fixture certificates, `courses` is always `[]` and
+        `assertEqual(len([]), len(set([])))` passes regardless of whether
+        dedup actually runs -- so this needs real data. Two certificates for
+        the same school pointing at the *same* Course exercise the dedup
+        loop for real: without it, the override would see the course twice.
+        """
+        course = make_course()
+        make_certificate(self.school, course=course)
+        make_certificate(self.school, course=course)
+
         seen = {}
 
         def override(signature, courses):
@@ -287,6 +297,7 @@ class ApprovedCourseListOverrideTests(TestCase):
                    return_value=override):
             self.sig.approved_course_list
 
+        self.assertEqual(len(seen['ids']), 1)
         self.assertEqual(len(seen['ids']), len(set(seen['ids'])))
 
     def test_override_return_value_is_what_gets_rendered(self):

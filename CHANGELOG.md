@@ -54,6 +54,20 @@ Releases are tagged on `Canusia/package-mou` and consumed by each tenant through
 
 ### Changed
 
+* **Four course shortcodes now read a different table.** `{{pathways_course_list}}`,
+  `{{choice_course_list}}`, `{{facilitator_course_list}}` and `{{course_list}}` imported
+  `FutureCourse` from the legacy `cis.models.future_sections` module (`cis_futurecourse`
+  table); they now import it from the `future_sections` app (`future_sections_futurecourse`
+  table), matching what `{{future_course_list}}` already read and what the host repo's
+  CLAUDE.md requires. **This is not a same-table refactor.** On any tenant that still has
+  rows in the legacy `cis_futurecourse` table, these four shortcodes will render different
+  courses after upgrading — and because `MOUSignature.mou_text` is computed live on every
+  render, with no snapshot taken at signing time, this changes the rendered body of
+  agreements that are already signed, not just new ones. The markup also changes: the
+  `future_sections` app's model exposes `section_display_html` (admin-configurable,
+  pre-formatted section lines), which the legacy model does not have. **Before upgrading,
+  compare row counts between `cis_futurecourse` and `future_sections_futurecourse` for your
+  tenant** to know whether you're affected.
 * **Dropped the two default send-window settings.** `default_send_after_mmdd` and
   `default_send_until_mmdd` prefilled the "Schedule to Send Starting On / Until"
   boxes when finalizing an MOU. They stamped the *current* year onto the stored

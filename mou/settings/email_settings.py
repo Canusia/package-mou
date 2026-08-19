@@ -52,7 +52,7 @@ AVAILABLE_SHORTCODES = _signature_shortcodes() + [
     ('pathways_course_list',    '{{pathways_course_list}} — Pathways courses list'),
     ('choice_course_list',      '{{choice_course_list}} — Choice (CCCL) courses list'),
     ('facilitator_course_list', '{{facilitator_course_list}} — Facilitator courses list'),
-    ('future_course_list',      '{{future_course_list}} — Submitted future courses list'),
+    ('future_course_list',      '{{future_course_list}} — Future courses list'),
     ('approved_course_list',    '{{approved_course_list}} — Approved / certified courses list'),
     ('role_lookup',             '{{role_<attr>_<Position>}} — Per-position admin lookup (any attribute, any position)'),
 ]

@@ -18,9 +18,18 @@ PKG_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 class OverrideNamesAreDocumentedTests(SimpleTestCase):
     def test_every_override_name_appears_in_the_readme(self):
+        """Plain substring containment is too weak: `course_queryset` is a
+        substring of `future_course_queryset`, `choice_course_queryset`,
+        `pathways_course_queryset` and `facilitator_course_queryset` (and
+        likewise `teacher_queryset` is a substring of its `choice_`/
+        `pathways_` siblings), so deleting `course_queryset`'s own readme row
+        would not fail this test under plain `in`. The readme documents each
+        override name as a backticked table token (see readme.md section 6),
+        so require that exact token rather than a bare substring.
+        """
         with open(os.path.join(PKG_ROOT, 'readme.md'), encoding='utf-8') as fh:
             readme = fh.read()
-        missing = [n for n in OVERRIDE_NAMES if n not in readme]
+        missing = [n for n in OVERRIDE_NAMES if f'`{n}`' not in readme]
         self.assertEqual(missing, [], f'undocumented overrides: {missing}')
 
     def test_every_documented_name_is_actually_consulted(self):
