@@ -911,7 +911,11 @@ class MOUSignature(models.Model):
             teacher_certs = teacher_certs.filter(
                 status__in=configs.get('teacher_course_status')
             )
-        
+
+        override = _tenant_mou_override('teacher_queryset')
+        if override is not None:
+            teacher_certs = override(self, teacher_certs)
+
         template = 'mou/templates/teacher_list.html'
 
         return render_to_string(template, {
@@ -947,6 +951,10 @@ class MOUSignature(models.Model):
             seen.add(course.id)
             courses.append(course)
 
+        override = _tenant_mou_override('approved_course_list')
+        if override is not None:
+            courses = override(self, courses)
+
         return render_to_string('mou/templates/approved_course_list.html', {
             'courses': courses,
         })
@@ -972,13 +980,17 @@ class MOUSignature(models.Model):
             teacher_certs = teacher_certs.filter(
                 status__in=configs.get('teacher_course_status')
             )
-        
+
+        override = _tenant_mou_override('choice_teacher_queryset')
+        if override is not None:
+            teacher_certs = override(self, teacher_certs)
+
         template = 'mou/templates/teacher_list.html'
 
         return render_to_string(template, {
             'teachers': teacher_certs
         })
-    
+
     @property
     def pathways_course_list(self):
         import importlib.util
@@ -996,12 +1008,16 @@ class MOUSignature(models.Model):
             'teacher_course__course__name'
         )
 
+        override = _tenant_mou_override('pathways_course_queryset')
+        if override is not None:
+            future_sections = override(self, future_sections)
+
         template = 'mou/templates/future_section_courses.html'
 
         return render_to_string(template, {
             'courses': future_sections
         })
-    
+
     @property
     def choice_course_list(self):
         import importlib.util
@@ -1019,12 +1035,16 @@ class MOUSignature(models.Model):
             'teacher_course__course__name'
         )
 
+        override = _tenant_mou_override('choice_course_queryset')
+        if override is not None:
+            future_sections = override(self, future_sections)
+
         template = 'mou/templates/future_section_courses.html'
 
         return render_to_string(template, {
             'courses': future_sections
         })
-    
+
     @property
     def facilitator_course_list(self):
         import importlib.util
@@ -1042,12 +1062,16 @@ class MOUSignature(models.Model):
             'teacher_course__course__name'
         )
 
+        override = _tenant_mou_override('facilitator_course_queryset')
+        if override is not None:
+            future_sections = override(self, future_sections)
+
         template = 'mou/templates/future_section_courses.html'
 
         return render_to_string(template, {
             'courses': future_sections
         })
-    
+
     @property
     def course_list(self):
         import importlib.util
@@ -1063,6 +1087,10 @@ class MOUSignature(models.Model):
         ).order_by(
             'teacher_course__course__name'
         )
+
+        override = _tenant_mou_override('course_queryset')
+        if override is not None:
+            future_sections = override(self, future_sections)
 
         template = 'mou/templates/future_section_courses.html'
 
@@ -1118,13 +1146,17 @@ class MOUSignature(models.Model):
             teacher_certs = teacher_certs.filter(
                 status__in=configs.get('teacher_course_status')
             )
-        
+
+        override = _tenant_mou_override('pathways_teacher_queryset')
+        if override is not None:
+            teacher_certs = override(self, teacher_certs)
+
         template = 'mou/templates/teacher_list.html'
 
         return render_to_string(template, {
             'teachers': teacher_certs
         })
-    
+
     @property
     def class_section_list(self):
         from cis.models.section import ClassSection
