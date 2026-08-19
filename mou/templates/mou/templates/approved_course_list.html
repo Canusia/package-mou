@@ -1,0 +1,20 @@
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Course</th>
+            <th>Code</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for course in courses %}
+        <tr>
+            <td>{{ course.title }}</td>
+            <td>{{ course.name }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="2"><em>No approved courses on record for this school.</em></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>

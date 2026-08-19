@@ -56,19 +56,32 @@ class Command(BaseCommand):
         signatures_emailed = 0
         for mou in ready_mous:
             if mou.should_message_be_sent(now=now):
-                pending_signatures = MOUSignature.objects.filter(
-                    status='pending',
-                    signator_template__mou=mou,
-                )
-                count = pending_signatures.count()
+                due = mou.current_unsigned_signatures()
+                due_count = due.count()
+                # Count what actually went out. send_notification returns
+                # without sending when is_active is No, when there is no
+                # recipient, or when the row's status is not emailable, so a
+                # pre-count reports sends that never happened. `status` alone
+                # is not a reliable post-send signal either: rows returned by
+                # current_unsigned_signatures() can already be 'pending' from
+                # a prior cycle (the reminder-resend case), so a bailed-out
+                # send would still read as pending. notification_count is
+                # only incremented inside the real-send branch of
+                # send_notification(), so compare it before/after instead.
+                sent = 0
+                for signature in due:
+                    before = int((signature.meta or {}).get('notification_count') or 0)
+                    signature.send_notification()
+                    signature.refresh_from_db(fields=['meta'])
+                    after = int((signature.meta or {}).get('notification_count') or 0)
+                    if after > before:
+                        sent += 1
 
-                summary_detail[str(mou.id)] = f'Sending to {count}'
-                for pending_signature in pending_signatures:
-                    pending_signature.send_notification()
+                summary_detail[str(mou.id)] = f'Sent to {sent} of {due_count} due'
 
-                if count:
+                if sent:
                     mous_emailed += 1
-                    signatures_emailed += count
+                    signatures_emailed += sent
             else:
                 summary_detail[str(mou.id)] = 'Not scheduled to be sent'
 

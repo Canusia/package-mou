@@ -40,7 +40,6 @@ def status_updated(sender, instance, **kwargs):
     previous_status = instance.tracker.previous('status')
     status = instance.status
 
-    print(previous_status, status)
     if previous_status != status:
         if status == 'signed':
             instance.send_notification()

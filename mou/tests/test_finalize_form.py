@@ -7,8 +7,12 @@ from django.test import TestCase, RequestFactory
 from cis.models.customuser import CustomUser
 from cis.models.term import AcademicYear
 
-from mou.mou.forms import MOUFinalizeForm
-from mou.mou.models import MOU
+try:
+    from mou.mou.forms import MOUFinalizeForm
+    from mou.mou.models import MOU
+except ImportError:
+    from mou.forms import MOUFinalizeForm
+    from mou.models import MOU
 
 
 class MOUFinalizeFormManagerTest(TestCase):

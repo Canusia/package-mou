@@ -67,6 +67,12 @@
                             {% if record.is_ready_to_be_signed %}
                                 {{form.media}}
 
+                                {% if pdf_download == 'before_and_after' %}
+                                <p class="mb-3">
+                                    <a href='{{record.as_pdf_url|safe}}'>Download PDF</a>
+                                </p>
+                                {% endif %}
+
                                 <form method="POST"
                                 id="frm_mou_sign">
                                     
@@ -76,6 +82,7 @@
 
                                     <input type="submit" class="btn btn-primary btn-sm submit" value="Sign and Submit">
                                 </form>
+                                {% if allow_change_requests %}
                                 <hr>
                                 <div class="text-center text-muted small mb-2">— or —</div>
                                 <button type="button"
@@ -92,25 +99,31 @@
                                         <input type="submit" class="btn btn-warning btn-sm submit" value="Submit Change Request">
                                     </form>
                                 </div>
-                            {% else %}
-                                {% if record.status == 'changes_requested' %}
-                                    <div class="alert alert-warning">
-                                        <strong>Change request submitted</strong>
-                                        {% if record.meta.change_requested_on %}
-                                            on {{ record.meta.change_requested_on }}
-                                        {% endif %}.
-                                        <p class="mb-0 mt-2">The MOU manager has been notified and will follow up. You will be invited to sign again once the MOU is updated.</p>
-                                        {% if record.meta.change_request_comment %}
-                                            <hr>
-                                            <small><strong>Your comment:</strong></small>
-                                            <p class="mb-0"><em>{{ record.meta.change_request_comment }}</em></p>
-                                        {% endif %}
-                                    </div>
                                 {% endif %}
+                            {% elif record.status == 'signed' %}
                                 <p class="alert alert-info">The MOU has been signed by you.
+                                    {% if pdf_download != 'never' %}
                                     <br><br>
                                     <a href='{{record.as_pdf_url|safe}}'>Download PDF</a>
+                                    {% endif %}
                                 </p>
+                            {% elif record.status == 'changes_requested' %}
+                                <div class="alert alert-warning">
+                                    <strong>Change request submitted</strong>
+                                    {% if record.meta.change_requested_on %}
+                                        on {{ record.meta.change_requested_on }}
+                                    {% endif %}.
+                                    <p class="mb-0 mt-2">The MOU manager has been notified and will follow up. You will be invited to sign again once the MOU is updated.</p>
+                                    {% if record.meta.change_request_comment %}
+                                        <hr>
+                                        <small><strong>Your comment:</strong></small>
+                                        <p class="mb-0"><em>{{ record.meta.change_request_comment }}</em></p>
+                                    {% endif %}
+                                </div>
+                            {% elif record.status == 'next' %}
+                                <p class="alert alert-info">It is your turn to sign, but the please-sign email has not been sent yet. The signing form will appear after that email goes out.</p>
+                            {% else %}
+                                <p class="alert alert-info">It is not your turn yet. Someone earlier in the signing order still needs to sign.</p>
                             {% endif %}
                         </div>
                     </div>
