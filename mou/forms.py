@@ -123,9 +123,6 @@ class MOUFinalizeForm(forms.Form):
             if cfg.get('default_cron'):
                 self.fields['cron'].initial = cfg.get('default_cron')
 
-        if not record.send_on_after or not record.send_until:
-            self._prefill_default_send_window(record)
-
         self.fields['manager'].queryset = CustomUser.objects.filter(
             groups__name='ce'
         ).order_by('first_name', 'last_name')
@@ -142,21 +139,6 @@ class MOUFinalizeForm(forms.Form):
             self.helper.form_action = reverse_lazy(
                 'memo:memo', args=[record.id]
             )
-
-    def _prefill_default_send_window(self, record):
-        """Apply default MM/DD from settings using the current year.
-
-        Only fills blanks so an already-scheduled MOU is not rewritten.
-        """
-        from .settings.helpers import mou_cfg
-        cfg = mou_cfg()
-        year = datetime.datetime.now().year
-        if not record.send_on_after and cfg.get('default_send_after_mmdd'):
-            mmdd = cfg.get('default_send_after_mmdd').strip()
-            self.fields['send_after'].initial = f'{mmdd}/{year}' if '/' in mmdd and mmdd.count('/') == 1 else mmdd
-        if not record.send_until and cfg.get('default_send_until_mmdd'):
-            mmdd = cfg.get('default_send_until_mmdd').strip()
-            self.fields['send_until'].initial = f'{mmdd}/{year}' if '/' in mmdd and mmdd.count('/') == 1 else mmdd
 
     def clean_status(self):
         if self.record.status == 'sent':

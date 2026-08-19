@@ -44,6 +44,20 @@ Releases are tagged on `Canusia/package-mou` and consumed by each tenant through
 
 ### Changed
 
+* **Dropped the two default send-window settings.** `default_send_after_mmdd` and
+  `default_send_until_mmdd` prefilled the "Schedule to Send Starting On / Until"
+  boxes when finalizing an MOU. They stamped the *current* year onto the stored
+  month/day, so an MOU finalized late in the year prefilled a window that had
+  already closed — and because the prefill only fired on a blank field, saving the
+  form for any unrelated reason wrote that stale window onto the record silently.
+  A send window is per-agreement; it is now always chosen deliberately. The
+  per-MOU fields (`MOU.send_on_after` / `MOU.send_until`) are unchanged, and no
+  existing schedule is affected.
+* **Relabelled `default_cron`** to "Default reminder schedule for new MOUs", with
+  help text stating that it only prefills an unscheduled MOU and never reschedules
+  one that is already sending. The old label read like a live control over
+  reminder timing; it is not — `send_mou_emails` reads `MOU.cron`.
+
 * **Version metadata now tracks the tag.** `setup.cfg` read `0.1` and `pyproject.toml` read
   `0.0.7` — disagreeing with each other and with reality. pip keys upgrades off the version
   string, so a tenant bumping its `git+…@tag` pin without this fix would have kept the old

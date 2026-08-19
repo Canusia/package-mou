@@ -252,34 +252,14 @@ class SettingForm(forms.Form):
     default_cron = forms.CharField(
         max_length=40,
         required=False,
-        label='Default reminder schedule',
+        label='Default reminder schedule for new MOUs',
         help_text=(
-            'Starting value when you finalize an MOU. Example: 0 7 * * * means '
-            'every day at 7:00 a.m.'
+            'Prefills the schedule box when you finalize an MOU that does not have '
+            'one yet. It never changes an MOU that is already scheduled, and editing '
+            'it here does not reschedule anything already sending. '
+            'Example: 0 7 * * * means every day at 7:00 a.m.'
         ),
         widget=forms.TextInput(attrs={'class': 'col-md-4 col-sm-12'}),
-    )
-
-    default_send_after_mmdd = forms.CharField(
-        max_length=5,
-        required=False,
-        label='Default start date (month/day)',
-        help_text=(
-            'Starting value for “Schedule to Send Starting On” when you finalize '
-            'an MOU. Uses this month and day in the current year. Example: 05/01.'
-        ),
-        widget=forms.TextInput(attrs={'class': 'col-md-4 col-sm-12', 'placeholder': '05/01'}),
-    )
-
-    default_send_until_mmdd = forms.CharField(
-        max_length=5,
-        required=False,
-        label='Default end date (month/day)',
-        help_text=(
-            'Starting value for “Keep Sending Until” when you finalize an MOU. '
-            'Uses this month and day in the current year. Example: 12/01.'
-        ),
-        widget=forms.TextInput(attrs={'class': 'col-md-4 col-sm-12', 'placeholder': '12/01'}),
     )
 
     STATUS_OPTIONS = [

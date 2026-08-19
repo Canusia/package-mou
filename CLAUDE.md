@@ -10,7 +10,7 @@ Manages Memorandums of Understanding with digital signature collection from scho
 
 ### Models (`models.py`)
 - **MOU** - Document with title, academic year, template text, CRON schedule. `manager` (CustomUser FK, optional) — primary contact for change-request notifications.
-- **MOUSignator** - Signature template defining who signs and order (weight 1-4)
+- **MOUSignator** - Signature template defining who signs and order (weight 1..`max_signator_weight`, default 8)
 - **MOUSignature** - Actual signature records per school/signer combination
 - **MOUNote** - Internal notes on MOUs
 
@@ -20,7 +20,7 @@ Manages Memorandums of Understanding with digital signature collection from scho
 - `college_admin` - College administrator (weights 3-4)
 
 ### Signature Status Flow
-`''` (not ready) → `'pending'` → `'signed'`
+`''` (not ready) → `'next'` (their turn, not yet emailed) → `'pending'` (emailed) → `'signed'`
 
 A signer may instead submit a **change request** from the sign page, which moves the record to `'changes_requested'` and pauses the chain (no `next_signator()` call). An admin then either edits the MOU and uses the existing `change_signature_status` bulk action to flip the row back to `'pending'`, or leaves it as a record of why the school declined.
 
@@ -62,7 +62,7 @@ Use in `mou_text` field:
 - `{{teacher_list}}`, `{{choice_teacher_list}}`, `{{pathways_teacher_list}}`
 - `{{course_list}}`, `{{choice_course_list}}`, `{{pathways_course_list}}`, `{{facilitator_course_list}}`, `{{future_course_list}}`
 - `{{role_<attr>_<Position_Name>}}` — looks up the `HSAdministratorPosition` for this MOU's highschool whose `position.name` matches `<Position_Name>` (case-insensitive, underscores → spaces) and renders the named user attribute. `<attr>` ∈ `first_name`, `last_name`, `email`, `name` (= `"First Last"`). Empty string if no admin holds that position. Examples: `{{role_first_name_Academic_Principal}}`, `{{role_last_name_Dean_of_Guidance}}`, `{{role_email_Principal}}`.
-- `{{signature_1}}` through `{{signature_4}}` - Signature boxes by weight
+- `{{signature_1}}` … `{{signature_N}}` - Signature boxes by weight, where N is `max_signator_weight` (default 8). Exempt from the `available_shortcodes` gate, so raising the chain length never blanks them on a tenant whose saved list predates the change.
 
 ## Signature Workflow
 
@@ -108,7 +108,7 @@ Edit via the standard MyCE Settings UI (`/ce/settings/`, look for
 
 | Field | Type | Purpose |
 |---|---|---|
-| `is_active` | choice (`Yes`/`No`/`Debug`) | Master toggle. `Debug` routes pending-signature emails to `notify_address` only. |
+| `is_active` | choice (`Yes`/`No`/`Debug`) | Master toggle for **all** MOU email. `Debug` routes to `notify_address` only; `No` sends nothing. Decorative before v0.0.8 — migration `0006` sets existing tenants to `Yes` so upgrading does not silently redirect live mail. |
 | `notify_address` | comma-separated emails | Recipients in Debug mode and for roster-status notifications. |
 | `teacher_course_status` | multi-select | Teacher cert statuses included in `{{teacher_list}}` and the choice/pathways variants. |
 | `college_administrator_1` | user FK | Auto-attached as a weight-3 signator on every MOU. |
@@ -118,6 +118,17 @@ Edit via the standard MyCE Settings UI (`/ce/settings/`, look for
 | `change_request_email_subject` / `change_request_email_message` | text / HTML | "Change Requested" email sent to `MOU.manager` (fallback: `notify_address`) when a signer submits a change request. Supports `{{highschool_name}}`, `{{signator_firstname}}`, `{{signator_lastname}}`, `{{mou_title}}`, `{{comment}}`, `{{mou_url}}`, `{{signature_url}}`. |
 | `available_shortcodes` | multi-select | Allowlist of shortcodes substituted in `mou_text`. Unchecked shortcodes render as empty strings. The `role_lookup` choice covers the entire `{{role_<attr>_<Position>}}` family. |
 | `future_course_list_template` | HTML | Django-template HTML used by `{{future_course_list}}`. Receives `courses` (FutureCourse queryset). Leave blank to use the bundled `mou/templates/future_section_courses.html`. |
+| `default_cron` | text | Prefills the schedule box when finalizing an MOU that has none. Read only in `MOUEditorForm.__init__`; never consulted by `send_mou_emails`, which uses `MOU.cron`. |
+| `max_signator_weight` | int (default 8) | Length of the signing chain, and how many `{{signature_N}}` shortcodes render. |
+| `allow_college_admin_any_weight` | choice (`Yes`/`No`) | `No` restricts college signators to weights 3-4. |
+| `vacant_role_policy` | choice | `skip_silent` / `skip_and_notify` / `hold_school` — what happens when adding a school where nobody holds a title in the signing order. |
+| `allow_change_requests` | choice (`Yes`/`No`) | Shows the "request changes" control on the sign page. |
+| `pdf_download` | choice | `before_and_after` / `after_only` / `never` on the signing page. |
+| `hs_admin_can_view_signed_mous` | choice (`Yes`/`No`) | Shows the HS-admin Signed MOUs page. **No effect unless the host includes `mou.urls.highschool_admin`.** |
+| `retention_years` | int (default 6) | Hides signed agreements older than this from the HS-admin list; `0` = never hide. |
+| `reminder_email_subject` / `reminder_email_message` | text / HTML | Used from the second send onward; blank reuses the main pending-signature copy. |
+| `heads_up_email` / `heads_up_include_college` | choice (`Yes`/`No`) | One-time FYI to later signers when a school's first request goes out, without a signing link. |
+| `heads_up_email_subject` / `heads_up_email_message` | text / HTML | Heads-up wording. Both must be non-empty or nothing is sent. |
 
 ### How to configure
 
