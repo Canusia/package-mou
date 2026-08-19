@@ -135,8 +135,11 @@ Edit via the standard MyCE Settings UI (`/ce/settings/`, look for
 1. Run `python manage.py register_settings` once after install (or after pulling new fields). This scans each app's `CONFIGURATORS` list and creates a `SettingRecord` for `email_settings` if it doesn't exist yet. First registration calls `email_settings.install()`, which seeds defaults — including `available_shortcodes` populated with all 15 shortcode keys (so existing MOUs render unchanged).
 2. Open `/ce/settings/` in the CE portal. Find the **MOU Notifications** category and click into it.
 3. Edit any of the fields above and **Save**. Values are persisted into `cis.Setting.value` (JSONField); change history is tracked via `django-simple-history` and visible in the Change Log tab on the Setting detail page.
-4. To customize the `{{future_course_list}}` rendering: copy the contents of `mou/templates/future_section_courses.html` into the **`{{future_course_list}}` HTML Template** textarea as a starting point, then edit. The HTML is validated as a Django template at save time (`validate_html_short_code`) so syntax errors are caught early. The `courses` variable is the FutureCourse queryset (filtered by the MOU's highschool + academic year, `submitted_on__isnull=False`).
+4. To customize the `{{future_course_list}}` rendering: copy the contents of `mou/templates/future_section_courses.html` into the **`{{future_course_list}}` HTML Template** textarea as a starting point, then edit. The HTML is validated as a Django template at save time (`validate_html_short_code`) so syntax errors are caught early. The `courses` variable is the FutureCourse queryset (filtered by the MOU's highschool + academic year only — note it does **not**
+filter on `submitted_on`, so unsubmitted projections are included; add a
+`future_course_queryset` tenant override if you need them excluded).
 5. To restrict which shortcodes admins can use in `mou_text`: uncheck the unwanted entries under **Available Shortcodes**. Disallowed shortcodes render as empty strings; existing `mou_text` is not validated retroactively, so a previously authored shortcode silently disappears at render time.
+6. To change **which records** a list shortcode selects (as opposed to how they render), define a tenant override — see `mou/readme.md` section 6, "Overriding what the list shortcodes select".
 
 ### Reading the setting from code
 

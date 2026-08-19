@@ -5,6 +5,16 @@ Releases are tagged on `Canusia/package-mou` and consumed by each tenant through
 
 ## v0.0.8 — 2026-08-18
 
+### Added
+
+* **Tenant overrides for what the list shortcodes select.** All nine list
+  shortcodes (`{{teacher_list}}`, `{{course_list}}`, `{{future_course_list}}`, …)
+  hardcoded one deployment's notion of which records belong in an MOU — one of
+  them cites a specific tenant's workbook in its own docstring. Each now
+  consults an optional `services/mou.py` override, receiving the package's
+  default queryset so a tenant can refine rather than restate it. Defining
+  nothing keeps current behaviour exactly. See readme section 6.
+
 ### Fixed
 
 * **Upgrading no longer silently stops live email.** `is_active` was decorative before

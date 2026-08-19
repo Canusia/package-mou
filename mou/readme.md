@@ -134,3 +134,42 @@ the title is filled creates only the missing rows.
 | **How long signed agreements stay listed (years)** (`retention_years`) | `6` | Hides signed agreements older than this from the HS-admin list. `0` means never hide. |
 | **Available shortcodes** (`available_shortcodes`) | *(all)* | Which shortcodes may be used in MOU body text. `{{signature_N}}` is exempt — signature blocks always render, so raising the signer count never blanks them on a tenant whose saved list predates the change. |
 
+## 6. Overriding what the list shortcodes select
+
+Which records belong in an MOU is deployment policy — one tenant's agreement
+lists approved courses, another's lists next-year projections, another's wants
+only projections a school actually submitted. Each list shortcode therefore
+resolves an optional tenant override before rendering.
+
+Define any of these in your tenant app's `services/mou.py` (the module named by
+`settings.TENANT_SERVICES_APP`, e.g. `myce_tenant_configs/services/mou.py`).
+Anything you do not define keeps the package default.
+
+| Shortcode | Override name | Receives |
+|---|---|---|
+| `{{teacher_list}}` | `teacher_queryset` | `TeacherCourseCertificate` queryset |
+| `{{choice_teacher_list}}` | `choice_teacher_queryset` | `TeacherCourseCertificate` queryset |
+| `{{pathways_teacher_list}}` | `pathways_teacher_queryset` | `TeacherCourseCertificate` queryset |
+| `{{approved_course_list}}` | `approved_course_list` | **list of `Course`**, already deduplicated |
+| `{{pathways_course_list}}` | `pathways_course_queryset` | `FutureCourse` queryset |
+| `{{choice_course_list}}` | `choice_course_queryset` | `FutureCourse` queryset |
+| `{{facilitator_course_list}}` | `facilitator_course_queryset` | `FutureCourse` queryset |
+| `{{course_list}}` | `course_queryset` | `FutureCourse` queryset |
+| `{{future_course_list}}` | `future_course_queryset` | `FutureCourse` queryset |
+
+Each takes `(signature, queryset)` and returns an iterable of the same model.
+The package's default is passed in, so refine it rather than restating the
+package's filters — otherwise your copy silently diverges when the package
+changes them.
+
+```python
+# myce_tenant_configs/services/mou.py
+
+def future_course_queryset(signature, queryset):
+    """Only projections the school actually submitted."""
+    return queryset.filter(submitted_on__isnull=False)
+```
+
+These control **selection only**. To change how the rows look, use the
+`future_course_list_template` setting, or override the template files.
+
