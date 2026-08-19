@@ -31,6 +31,29 @@ from cis.models.district import DistrictPosition, DistrictAdministratorPosition
 
 from .settings.email_settings import email_settings as configs
 
+
+def _tenant_mou_override(name):
+    """Return the tenant's override for an MOU shortcode's selection, or None.
+
+    Which records belong in an MOU is deployment policy: one tenant's MOU lists
+    approved courses, another's lists next-year projections, another's filters
+    to submitted projections only. A tenant opts in by defining the named
+    function in its ``services/mou.py``; tenants that define nothing get the
+    package defaults unchanged.
+
+    The contract is ``override(signature, queryset)`` -> an iterable of the same
+    model. The package's default queryset is passed in so a tenant can refine it
+    (``queryset.filter(...)``) rather than restate the package's filters, which
+    would then silently diverge whenever the package changed them.
+
+    Imported inside the function on purpose -- a tenant's services module
+    imports model classes at its own module level, so resolving one while this
+    module is still importing risks AppRegistryNotReady.
+    """
+    from cis.services.tenant_services import get_tenant_override
+    return get_tenant_override('mou', name)
+
+
 class MOU(models.Model):
     """
     Speaker model
@@ -1062,6 +1085,10 @@ class MOUSignature(models.Model):
         ).order_by(
             'teacher_course__course__name'
         )
+
+        override = _tenant_mou_override('future_course_queryset')
+        if override is not None:
+            future_sections = override(self, future_sections)
 
         # If the admin configured a custom HTML template for this shortcode,
         # render it as an inline Django template; otherwise fall back to the
