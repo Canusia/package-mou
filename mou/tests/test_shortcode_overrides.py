@@ -16,6 +16,17 @@ from django.test import TestCase
 from ..models import _tenant_mou_override
 from .factories import make_mou_with_chain
 
+# The package installs nested (in-tree submodule, mou.mou -- what ewu mounts)
+# or flat (pip-installed, mou). Resolve the render_to_string patch target the
+# same way test_heads_up.py / test_request_changes.py resolve send_html_mail,
+# so this test module works under either layout.
+try:
+    from mou.mou import models as _models_module
+    _RENDER_TO_STRING = 'mou.mou.models.render_to_string'
+except ImportError:
+    from mou import models as _models_module
+    _RENDER_TO_STRING = 'mou.models.render_to_string'
+
 
 class TenantOverrideResolverTests(TestCase):
     def test_returns_none_when_the_tenant_ships_nothing(self):
@@ -43,10 +54,23 @@ class FutureCourseListOverrideTests(TestCase):
         self.sig = self.sigs[1]
 
     def test_default_selection_is_unchanged_without_an_override(self):
+        """A tenant that opts in with a pass-through override must see byte-
+        identical output to a tenant that ships no override at all -- the
+        seam must be transparent when a tenant does nothing.
+        """
         with patch('cis.services.tenant_services.get_tenant_override',
                    return_value=None):
-            html = self.sig.future_course_list
-        self.assertIsInstance(html, str)
+            without_override = self.sig.future_course_list
+
+        def pass_through(signature, queryset):
+            return queryset
+
+        with patch('cis.services.tenant_services.get_tenant_override',
+                   return_value=pass_through):
+            with_pass_through_override = self.sig.future_course_list
+
+        self.assertIsInstance(without_override, str)
+        self.assertEqual(without_override, with_pass_through_override)
 
     def test_override_receives_signature_and_default_queryset(self):
         seen = {}
@@ -95,7 +119,7 @@ class FutureCourseListOverrideTests(TestCase):
 
         with patch('cis.services.tenant_services.get_tenant_override',
                     return_value=override), \
-             patch('mou.mou.models.render_to_string') as mock_render:
+             patch(_RENDER_TO_STRING) as mock_render:
             self.sig.future_course_list
 
         rendered_courses = mock_render.call_args.args[1]['courses']
