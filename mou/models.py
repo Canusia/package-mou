@@ -1,4 +1,5 @@
 import copy
+import logging
 import re
 import uuid, datetime
 
@@ -30,6 +31,8 @@ from cis.models.highschool_administrator import HSPosition, HSAdministratorPosit
 from cis.models.district import DistrictPosition, DistrictAdministratorPosition
 
 from .settings.email_settings import email_settings as configs
+
+logger = logging.getLogger(__name__)
 
 
 def _tenant_mou_override(name):
@@ -281,7 +284,16 @@ class MOU(models.Model):
         if self.can_edit():
             return (False, 'MOU is not finalized')
         
-        highschools = HighSchool.objects.filter(status__iexact='active')
+        # Only the schools active on the MOU's campus (its academic year's),
+        # else the current campus. No campus (multi-campus, no context): none.
+        from cis.campus_context import current_campus_or_none
+        from cis.highschool_scope import campus_highschools
+        campus = getattr(self.academic_year, 'campus', None) or current_campus_or_none()
+        if campus is None:
+            logger.warning(
+                'MOU %s: no campus to seed signatures for; none created.', self.pk)
+            return {}
+        highschools = campus_highschools(campus).order_by('name')
 
         signators = MOUSignator.objects.filter(
             mou=self

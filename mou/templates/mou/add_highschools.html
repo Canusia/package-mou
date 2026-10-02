@@ -26,7 +26,7 @@
               <th>CEEB</th>
               <th>District</th>
               <th>City / State</th>
-              <th>Status</th>
+              <th>Campus Status</th>
             </tr>
           </thead>
           <tbody>
@@ -42,10 +42,10 @@
                 {{ hs.city }}{% if hs.city and hs.state_code %}, {% endif %}{{ hs.state_code }}
               </td>
               <td>
-                {% if hs.status|lower == 'active' %}
-                  <span class="badge badge-success">{{ hs.status }}</span>
+                {% if hs.campus_status == 'Active' %}
+                  <span class="badge badge-success">{{ hs.campus_status }}</span>
                 {% else %}
-                  <span class="badge badge-secondary">{{ hs.status|default:'—' }}</span>
+                  <span class="badge badge-secondary">{{ hs.campus_status|default:'—' }}</span>
                 {% endif %}
               </td>
             </tr>

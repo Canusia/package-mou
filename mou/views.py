@@ -415,9 +415,18 @@ def add_highschools(request):
 
     mou_id = request.GET.get('mou_id')
 
-    # The same schools the form accepts: active on the current campus.
+    # The same schools the form accepts: active on the current campus. The
+    # status shown is the school's link status on that campus.
+    from django.db.models import F, OuterRef, Subquery
+    from django.db.models.functions import Coalesce
+    from cis.campus_context import current_campus_or_none
     from cis.highschool_scope import picker_queryset
-    highschools = picker_queryset().select_related('district')
+    from cis.models.highschool import HighSchoolCampus
+    campus = current_campus_or_none()
+    highschools = picker_queryset(campus).select_related('district').annotate(
+        campus_status=Coalesce(Subquery(HighSchoolCampus.objects.filter(
+            highschool=OuterRef('pk'), campus=campus).values('status')[:1]),
+            F('status')))
 
     context = {
         'title': 'Add High School(s)',
@@ -425,7 +434,8 @@ def add_highschools(request):
         'highschools': highschools,
         'form_submit_button_title': 'Save',
         'form_header': mark_safe(
-            '<p class="alert alert-info mb-3">Filter by name, CEEB, district, or status. '
+            '<p class="alert alert-info mb-3">Schools active on this campus. '
+            'Filter by name, CEEB, or district. '
             'Use the header checkbox to select all currently visible rows; selections '
             'persist across pages.</p>'
         ),
