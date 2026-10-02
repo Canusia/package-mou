@@ -912,12 +912,10 @@ class AddHighSchoolForm(forms.Form):
     def __init__(self, mou_id=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        from cis.models.highschool import HighSchool
-        # Validate against the full queryset (any status). The "Add High
-        # School(s)" modal shows the status column so the user can decide
-        # whether to include non-Active schools; the form silently dropping
-        # them based on status would be surprising.
-        self.fields['highschools'].queryset = HighSchool.objects.order_by('name')
+        from cis.highschool_scope import picker_queryset
+        # Schools active on the current campus. Another campus's school is not
+        # offered, and a POSTed id for one fails validation.
+        self.fields['highschools'].queryset = picker_queryset()
 
         self.fields['action'].initial = kwargs.get('action', 'add_highschools')
         self.fields['mou_id'].initial = mou_id

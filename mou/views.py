@@ -415,7 +415,9 @@ def add_highschools(request):
 
     mou_id = request.GET.get('mou_id')
 
-    highschools = HighSchool.objects.select_related('district').order_by('name')
+    # The same schools the form accepts: active on the current campus.
+    from cis.highschool_scope import picker_queryset
+    highschools = picker_queryset().select_related('district')
 
     context = {
         'title': 'Add High School(s)',
