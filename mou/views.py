@@ -71,6 +71,12 @@ def _scoped(model):
     return compat.scope_to_campus(model.objects.all(), path)
 
 
+def _scoped_or_404(model, pk):
+    """``pk`` from the current campus's rows, else 404 (another campus's
+    record is indistinguishable from a missing one)."""
+    return get_object_or_404(_scoped(model), pk=pk)
+
+
 class MOUViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = MOUSerializer
     permission_classes = [IsAuthenticated, IsCEUser]
@@ -145,7 +151,7 @@ def mou_add_new(request):
 @user_passes_test(user_has_cis_role, login_url='/')
 def mou_preview(request, record_id):
 
-    record = get_object_or_404(MOU, pk=record_id)
+    record = _scoped_or_404(MOU, record_id)
 
     message = record.preview()
     return render(
@@ -163,7 +169,7 @@ def duplicate_mou(request):
     ids = request.POST.getlist('ids[]')
     if not ids:
         return JsonResponse({'outcome': 'alert', 'status': 'error', 'title': 'Error', 'message': 'No MOU selected.'})
-    record = get_object_or_404(MOU, pk=ids[0])
+    record = _scoped_or_404(MOU, ids[0])
     try:
         new_mou = record.duplicate(request.user)
     except Exception as e:
@@ -187,7 +193,7 @@ def delete_mou(request):
     ids = request.POST.getlist('ids[]')
     if not ids:
         return JsonResponse({'outcome': 'alert', 'status': 'error', 'title': 'Error', 'message': 'No MOU selected.'})
-    record = get_object_or_404(MOU, pk=ids[0])
+    record = _scoped_or_404(MOU, ids[0])
 
     # MOU.can_edit() unconditionally returns True (dead code below it), so the
     # original guard never fired — check status directly so a sent MOU is
@@ -644,10 +650,18 @@ def delete_signature(request):
     
     return render(request, template, context)
 
+def _post_only(request):
+    return JsonResponse(
+        {'status': 'error', 'message': 'This action changes records; use POST.'},
+        status=405)
+
+
 def get_signature_link(request):
     template = 'mou/bulk_action.html'
+    if request.method != 'POST':
+        return _post_only(request)
 
-    ids = request.GET.getlist('ids[]')
+    ids = request.POST.getlist('ids[]')
     links = []
     for id in ids:
         signature = MOUSignature.objects.get(pk=id)
@@ -668,8 +682,10 @@ def get_signature_link(request):
 
 def send_signature_link(request):
     template = 'mou/bulk_action.html'
+    if request.method != 'POST':
+        return _post_only(request)
 
-    ids = request.GET.getlist('ids[]')
+    ids = request.POST.getlist('ids[]')
     links = []
     for id in ids:
         signature = MOUSignature.objects.get(pk=id)
@@ -700,13 +716,12 @@ def mou_signature_asPDF(self, signature_id):
     return record.download_as_pdf()
 mou_signature_asPDF.login_required=False
 
-@csrf_exempt
 @user_passes_test(user_has_cis_role, login_url='/')
 def mou(request, record_id):
     menu = draw_menu(cis_menu, 'highschools', 'mous')
     template = 'mou/mou.html'
     
-    record = get_object_or_404(MOU, pk=record_id)
+    record = _scoped_or_404(MOU, record_id)
     form = MOUEditorForm(request, record)
     finalize_form = MOUFinalizeForm(request, record)
     
@@ -715,22 +730,27 @@ def mou(request, record_id):
 
     if request.GET.get('action') == 'edit_signator':
         signator_id = request.GET.get('signator_id')
-        signator = MOUSignator.objects.get(pk=signator_id)
+        signator = get_object_or_404(MOUSignator, pk=signator_id, mou=record)
 
         form_signator = MOUSignatorForm(record=signator)
 
-    if request.GET.get('action') == 'delete_signator':
-        signator_id = request.GET.get('signator_id')
-        signator = MOUSignator.objects.get(pk=signator_id)
+    if (request.GET.get('action') == 'delete_signator'
+            or request.POST.get('action') == 'delete_signator'):
+        # State change: POST (CSRF-checked) only. It used to delete on a GET
+        # from a csrf_exempt view, so a link or image tag could do it.
+        if request.method != 'POST':
+            return JsonResponse(
+                {'status': 'error', 'message': 'Use POST to delete a signator.'},
+                status=405)
+        get_object_or_404(
+            MOUSignator, pk=request.POST.get('signator_id'), mou=record
+        ).delete()
 
-        signator.delete()
-        
-        data = {
-            'status':'success',
-            'message':'Successfully processed your rquest.',
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Successfully processed your request.',
             'action': 'reload_table'
-        }
-        return JsonResponse(data)
+        })
 
     if request.method == 'POST':
         action = request.POST.get('action')
@@ -839,7 +859,7 @@ def mous(request):
 
     academic_years = list(
         AcademicYear.objects.filter(
-            id__in=MOU.objects.values_list('academic_year_id', flat=True)
+            id__in=_scoped(MOU).values_list('academic_year_id', flat=True)
         ).order_by('-name')
     )
     initial_academic_year_id = academic_years[0].id if academic_years else ''

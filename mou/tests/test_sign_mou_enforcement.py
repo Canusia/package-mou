@@ -177,7 +177,7 @@ class SignMouEnforcementTests(TestCase):
         )
 
     def _send_signature_link(self, sig):
-        resp = self.client.get(
+        resp = self.client.post(
             reverse('mou_ce:bulk_action'),
             {'action': 'send_signature_link', 'ids[]': [str(sig.id)]},
         )

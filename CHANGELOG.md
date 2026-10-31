@@ -7,6 +7,15 @@ Releases are tagged on `Canusia/package-mou` and consumed by each tenant through
 
 ### Fixed
 
+* **Remaining CE views are campus-scoped; state changes are POST + CSRF
+  (#2, review P-1 follow-up).** The MOU detail page, the index year list,
+  preview and the Duplicate / Delete MOU actions now look records up through
+  the same campus scope as the bulk endpoint and API (another campus's record
+  is a 404; single-campus is unchanged). `mou?action=delete_signator` no
+  longer deletes on GET and the detail view is no longer `csrf_exempt`; Copy /
+  Send signing link are POST-only. The package JS sends the CSRF token. Tenant
+  templates that linked to `?action=delete_signator` by GET must move to the
+  bulk modal (none found).
 * **Tenants with an in-repo `cis`, or no campus, can install and run the
   package again (#2).** `myce_cis` moved from the install requirements to the
   optional `campus` extra (`myce_mou[campus]`) in both `pyproject.toml` and

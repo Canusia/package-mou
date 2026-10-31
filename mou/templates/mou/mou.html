@@ -435,6 +435,13 @@
                             tbl_signatures.ajax.reload(function(){}, false);
                         }
                         
+                        function mouCsrfToken() {
+                            var input = document.querySelector('input[name=csrfmiddlewaretoken]');
+                            if (input && input.value) return input.value;
+                            var m = document.cookie.match(/(?:^|;\s*)[^=;\s]*csrftoken=([^;]+)/);
+                            return m ? decodeURIComponent(m[1]) : '';
+                        }
+
                         function do_bulk_action(action, dt) {
 
                             if(action == 'edit_mou_signator') {
@@ -525,10 +532,13 @@
                                     url = "{%url 'mou_ce:bulk_action' %}"
                                     let modal = "modal-bulk_actions"
 
+                                    // Copy / send signing link change records: POST + CSRF.
+                                    let isPost = (action == 'get_signature_link' || action == 'send_signature_link');
                                     $.ajax({
-                                        type: "GET",
+                                        type: isPost ? "POST" : "GET",
                                         url: url,
                                         data: data,
+                                        headers: isPost ? {'X-CSRFToken': mouCsrfToken()} : {},
                                         success: function(response) {
 
                                             selectedRows.deselect();

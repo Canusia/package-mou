@@ -13,6 +13,16 @@
     return window.MOU_BULK_ACTIONS_URL || '/ce/highschools/mous/mou/do_bulk_action';
   }
 
+  // Copy / send signing link change records, so they POST with the CSRF token.
+  var POST_ACTIONS = ['get_signature_link', 'send_signature_link'];
+
+  function mouCsrfToken() {
+      var input = document.querySelector('input[name=csrfmiddlewaretoken]');
+      if (input && input.value) return input.value;
+      var m = document.cookie.match(/(?:^|;\s*)[^=;\s]*csrftoken=([^;]+)/);
+      return m ? decodeURIComponent(m[1]) : '';
+  }
+
   function doBulkAction(action, dt) {
     if (!dt.rows('.selected').any()) {
       alert('Please select a row and try again.');
@@ -23,10 +33,12 @@
     selected.every(function () { data.ids.push(this.id()); });
 
     $(dt).block();
+    var isPost = POST_ACTIONS.indexOf(action) !== -1;
     $.ajax({
-      type: 'GET',
+      type: isPost ? 'POST' : 'GET',
       url: bulkActionUrl(),
       data: data,
+      headers: isPost ? { 'X-CSRFToken': mouCsrfToken() } : {},
       success: function (response) {
         $('#bulk_modal_content').html(response);
         $('#modal-bulk_actions').modal('show');

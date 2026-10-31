@@ -100,7 +100,7 @@ class ApiRoleTests(_Base):
 
 class BulkActionRoleTests(_Base):
     def test_hs_admin_cannot_copy_a_signing_link(self):
-        response = self._bulk(self.hs_admin, action='get_signature_link',
+        response = self._bulk(self.hs_admin, method='post', action='get_signature_link',
                               **{'ids[]': [str(self.sig.id)]})
         self.assertEqual(response.status_code, 403)
         self.sig.refresh_from_db()
@@ -122,7 +122,7 @@ class BulkActionRoleTests(_Base):
                     self._bulk(self.hs_admin, action=action).status_code, 403)
 
     def test_ce_can_copy_a_signing_link(self):
-        response = self._bulk(self.ce, action='get_signature_link',
+        response = self._bulk(self.ce, method='post', action='get_signature_link',
                               **{'ids[]': [str(self.sig.id)]})
         self.assertEqual(response.status_code, 200)
         self.sig.refresh_from_db()
@@ -176,7 +176,7 @@ class MultiCampusScopeTests(_Base):
     def test_bulk_action_on_other_campus_row_is_refused(self):
         sig = self.theirs[2]
         with self.campus_context(self.a):
-            response = self._bulk(self.ce, action='get_signature_link',
+            response = self._bulk(self.ce, method='post', action='get_signature_link',
                                   **{'ids[]': [str(sig.id)]})
         self.assertEqual(response.status_code, 404)
         sig.refresh_from_db()
@@ -186,6 +186,6 @@ class MultiCampusScopeTests(_Base):
     def test_bulk_action_on_own_campus_row_works(self):
         sig = self.mine[2]
         with self.campus_context(self.a):
-            response = self._bulk(self.ce, action='get_signature_link',
+            response = self._bulk(self.ce, method='post', action='get_signature_link',
                                   **{'ids[]': [str(sig.id)]})
         self.assertEqual(response.status_code, 200)
