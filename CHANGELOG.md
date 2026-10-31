@@ -13,14 +13,64 @@ Releases are tagged on `Canusia/package-mou` and consumed by each tenant through
   `setup.cfg`. Every package-cis / host-only import now goes through
   `mou/compat.py`, which checks with `importlib.util.find_spec`: without
   `cis.highschool_scope` the Add High School(s) picker and modal list every
-  Active school (status shown is the school's own), and finalizing seeds them;
-  without `cis.services.tenant_services` there are no list-shortcode overrides;
-  without `myce.component_registry` the detail-page actions use a vendored
-  `ActionRegistry` (`mou/_actions.py`).
-* **Single-campus deployments with no campus no longer seed zero signatures.**
-  `MOU.initialize_signatures()` fails closed (none, with a warning) only in
-  multi-campus mode; a single-campus deployment with no campus seeds every
-  Active school, as before campus scoping. Multi-campus behaviour is unchanged.
+  Active school (status shown is the school's own), and adding schools there
+  creates their signatures; without `cis.services.tenant_services` there are
+  no list-shortcode overrides; without `myce.component_registry` the
+  detail-page actions use a vendored `ActionRegistry` (`mou/_actions.py`).
+* **The modal's campus status no longer assumes `HighSchoolCampus` exists.**
+  It is used only when cis has that model and the campus is real (has a pk);
+  otherwise the school's own status is shown. Hosts with a stand-in
+  `cis.highschool_scope` (embry) can drop their non-model `HighSchoolCampus`
+  shim once they run this release.
+* **The Duplicate/Delete MOU menu works on hosts without
+  `action_registry.js`.** The package ships `mou/js/action_registry.js` and
+  `mou.html` loads it only when `window.ActionRegistry` is missing.
+* **Signatures are seeded by Add High School(s), not by finalizing.** Single-campus
+  deployments with no campus, and a cis without campus scoping, are offered (and so
+  seed) every Active school; multi-campus with no campus is offered none.
+  `MOU.initialize_signatures()` follows the same rule but is unused: its only call
+  site has been commented out since the package began, so finalizing seeds nothing.
+
+### Security
+
+* **CE-only MOU endpoints.** `do_bulk_action` (add/delete signators and
+  signatures, change status, copy/send signing links, add schools) and the
+  three API viewsets (`api/mous`, `api/mou_signators`, `api/mou_signatures`)
+  now require the CE role; before, any logged-in user (a student, another
+  school's HS admin) could list every signature id, and so every signing URL,
+  or delete signatures. In multi-campus mode they only see and act on MOUs of
+  the current campus's academic years (plus campus-less years). The public
+  `/mou/sign_mou/<uuid>` page is unchanged.
+
+### Changed
+
+* `requires-python` is now `>=3.11` (pyproject and setup.cfg); the tests use
+  `tomllib`. Tenant images run 3.12.
+
+## v0.0.10 — 2026-10-02
+
+Reconstructed from git: tag `v0.0.10` peels to e4631ea, one commit after the
+`chore(release): v0.0.10` metadata bump (64462ee).
+
+### Added
+
+* **Campus-scoped school pickers.** The Add High School(s) picker offers only
+  schools with an Active `HighSchoolCampus` link to the current campus; a
+  posted id for another campus's school fails validation (0001411). Required
+  `myce_cis>=0.1.7a` (now optional, see Unreleased).
+
+### Fixed
+
+* **Signature seeding is campus-scoped**, and the Add High School(s) modal shows
+  each school's status on the current campus (e4631ea).
+
+## v0.0.9 — 2026-09-28
+
+### Fixed
+
+* **`install()` no longer overwrites a customised setting** (package-cis #51).
+  Defaults are seeded through `Setting.install_defaults()` (package-cis
+  v0.0.39+), which only adds missing keys (f1d9284).
 
 ## v0.0.8 — 2026-08-19
 

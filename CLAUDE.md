@@ -67,7 +67,7 @@ Use in `mou_text` field:
 ## Signature Workflow
 
 1. Create MOU in draft, add MOUSignators (define signature chain)
-2. Add schools via `add_highschools` - creates MOUSignature records
+2. Add schools via `add_highschools` - creates MOUSignature records (`AddHighSchoolForm.save`). This is the only seeding path: `MOU.initialize_signatures()` is unused (its call in `signals.status_updated` is commented out), so finalizing does not seed signatures
 3. Mark MOU as 'ready', set CRON schedule and send window
 4. `send_mou_emails` command sends to pending signers
 5. Signers click link, fill form (POC info, signature), submit
@@ -163,7 +163,14 @@ tenants with an in-repo `cis` must still install and run this package. Never
 import `cis.highschool_scope`, `cis.campus_context`, `HighSchoolCampus`,
 `cis.services.tenant_services` or `myce.component_registry` directly — go
 through `mou/compat.py` (`find_spec`-guarded; pre-campus fallback = every
-school whose own status is Active). `mou/_actions.py` is a vendored copy of
+school whose own status is Active; single-campus with no campus resolving
+also gets every Active school; multi-campus with no campus gets none). The
+picker in `AddHighSchoolForm` is what seeds signatures. `with_campus_status`
+checks for the `HighSchoolCampus` model with `apps.get_model` and a campus
+with a pk, independently of `HAS_CAMPUS`, because embry ships a stand-in
+`cis.highschool_scope`. `HAS_CAMPUS` keys on `cis.highschool_scope`, so a
+package-cis 0.1.0a–0.1.6a (campus_context but no highschool_scope) reads as
+single-campus even with `MULTI_CAMPUS=True`; no tenant runs one. `mou/_actions.py` is a vendored copy of
 `ActionRegistry`; keep it identical to the original. Tests that need campus
 support skip when `cis.highschool_scope` is missing.
 

@@ -281,6 +281,16 @@ class MOU(models.Model):
         )
     
     def initialize_signatures(self):
+        """Unused: nothing calls this (review I-2, package-mou#2).
+
+        Its only call site, in ``signals.status_updated``, has been commented
+        out since the package's first commit, so finalizing an MOU does NOT
+        seed signatures. Signatures are created by ``AddHighSchoolForm.save``
+        (the Add High School(s) modal), whose school choices come from
+        ``compat.picker_queryset()`` and follow the same campus rule as below.
+        Kept so the two stay in step; removing it is a separate cleanup. Note
+        its existing-signature check does not filter on this MOU.
+        """
         if self.can_edit():
             return (False, 'MOU is not finalized')
         
