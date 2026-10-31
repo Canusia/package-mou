@@ -522,6 +522,7 @@
                                     var selectedRows = dt.rows({ selected: true });
                                     let data = {
                                         'action': action,
+                                        'mou_id': '{{record.id}}',
                                         'ids': Array()
                                     }
                                     selectedRows.every(function() {

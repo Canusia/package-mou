@@ -133,9 +133,11 @@ def scope_to_campus(qs, academic_year_path):
     campus = current_campus_or_none()
     if campus is None:
         return qs.none()
+    # '' scopes AcademicYear rows themselves (their own ``campus`` field).
+    prefix = f'{academic_year_path}__' if academic_year_path else ''
     return qs.filter(
-        Q(**{f'{academic_year_path}__campus': campus})
-        | Q(**{f'{academic_year_path}__campus__isnull': True}))
+        Q(**{f'{prefix}campus': campus})
+        | Q(**{f'{prefix}campus__isnull': True}))
 
 
 def get_tenant_override(app, name):

@@ -12,7 +12,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.shortcuts import get_object_or_404, redirect, render
 from django.core.exceptions import ValidationError
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 
 from cis.models.settings import Setting
 from cis.utils import (
@@ -74,7 +74,16 @@ def _scoped(model):
 def _scoped_or_404(model, pk):
     """``pk`` from the current campus's rows, else 404 (another campus's
     record is indistinguishable from a missing one)."""
-    return get_object_or_404(_scoped(model), pk=pk)
+    return _get_or_404(_scoped(model), pk=pk)
+
+
+def _get_or_404(queryset, **filters):
+    """get_object_or_404 where a malformed (non-UUID) id is a 404, not the
+    ValidationError 500 a UUIDField lookup raises."""
+    try:
+        return get_object_or_404(queryset, **filters)
+    except (ValidationError, ValueError):
+        raise Http404('No such record.')
 
 
 class MOUViewSet(viewsets.ReadOnlyModelViewSet):
@@ -336,26 +345,35 @@ _SIGNATOR_ACTIONS = {'delete_signator', 'add_signator', 'edit_mou_signator'}
 
 
 def _bulk_ids_in_scope(request, action):
-    """False when any id the action names is outside the CE's campus."""
+    """False when any id the action names is missing, malformed, outside the
+    CE's campus (multi-campus), or not part of the posted ``mou_id``."""
     from . import compat
-    if not compat.is_multi_campus():
-        return True
     params = request.POST if request.method == 'POST' else request.GET
-    ids = set(params.getlist('ids[]')) | set(params.getlist('ids'))
-    checks = []
+    ids = {i for i in set(params.getlist('ids[]')) | set(params.getlist('ids')) if i}
+    mou_id = params.get('mou_id') or None
+    signator_ids, signature_ids = set(), set()
     if action in _SIGNATURE_ACTIONS:
-        checks.append((MOUSignature, ids))
+        signature_ids = ids
     if action in _SIGNATOR_ACTIONS:
         signator_ids = set(ids)
         if params.get('id') and params.get('id') != '-1':
             signator_ids.add(params.get('id'))
-        checks.append((MOUSignator, signator_ids))
-    if params.get('mou_id'):
-        checks.append((MOU, {params.get('mou_id')}))
+    # Deleting signators by bare id could reach any MOU's: the modal posts
+    # the page's mou_id and it is required.
+    if action == 'delete_signator' and request.method == 'POST' and not mou_id:
+        return False
     try:
-        for model, wanted in checks:
-            wanted = {i for i in wanted if i}
-            if wanted and _scoped(model).filter(pk__in=wanted).count() != len(wanted):
+        if mou_id and not _scoped(MOU).filter(pk=mou_id).exists():
+            return False
+        for model, wanted, member in (
+                (MOUSignature, signature_ids, 'signator_template__mou_id'),
+                (MOUSignator, signator_ids, 'mou_id')):
+            if not wanted:
+                continue
+            rows = _scoped(model).filter(pk__in=wanted)
+            if rows.count() != len(wanted):
+                return False
+            if mou_id and rows.filter(**{member: mou_id}).count() != len(wanted):
                 return False
     except (ValidationError, ValueError):
         return False
@@ -524,10 +542,10 @@ def add_signator(request):
 
         mou_id = request.POST.get('mou_id')
         id = request.POST.get('id')
-        mou = MOU.objects.get(pk=mou_id)
+        mou = _scoped_or_404(MOU, mou_id)
 
         if id != '-1':
-            record = MOUSignator.objects.get(pk=id)
+            record = _get_or_404(MOUSignator, pk=id, mou=mou)
         else:
             record = None
 
@@ -553,7 +571,8 @@ def add_signator(request):
     record = None
     mou_id = request.GET.get('mou_id')
     if request.GET.get('id'):
-        record = MOUSignator.objects.get(pk=request.GET.get('id'))
+        record = _get_or_404(
+            MOUSignator, pk=request.GET.get('id'), mou=_scoped_or_404(MOU, mou_id))
         
     form = MOUSignatorForm(record=record, mou_id=mou_id)
 
@@ -603,7 +622,8 @@ def delete_signator(request):
         return JsonResponse(data, status=400)
 
     ids = request.GET.getlist('ids[]')
-    form = MOUSignatorDeleteForm(ids)
+    form = MOUSignatorDeleteForm(
+        ids, initial={'mou_id': request.GET.get('mou_id') or ''})
     context = {
         'title': 'Delete Selected MOU Signator(s)',
         'form': form,
@@ -730,7 +750,7 @@ def mou(request, record_id):
 
     if request.GET.get('action') == 'edit_signator':
         signator_id = request.GET.get('signator_id')
-        signator = get_object_or_404(MOUSignator, pk=signator_id, mou=record)
+        signator = _get_or_404(MOUSignator, pk=signator_id, mou=record)
 
         form_signator = MOUSignatorForm(record=signator)
 
@@ -742,7 +762,7 @@ def mou(request, record_id):
             return JsonResponse(
                 {'status': 'error', 'message': 'Use POST to delete a signator.'},
                 status=405)
-        get_object_or_404(
+        _get_or_404(
             MOUSignator, pk=request.POST.get('signator_id'), mou=record
         ).delete()
 
@@ -798,6 +818,11 @@ def mou(request, record_id):
                 }, status=400)
         
         elif action == 'edit_mou_signator':
+            # The signator being edited must belong to the MOU on this page
+            # (another MOU's, possibly another campus's, was writable by id).
+            posted_id = request.POST.get('id')
+            if posted_id and posted_id != '-1':
+                _get_or_404(MOUSignator, pk=posted_id, mou=record)
             form = MOUSignatorForm(
                 record=None, data=request.POST
             )

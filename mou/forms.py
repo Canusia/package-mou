@@ -33,6 +33,13 @@ from cis.models.district import DistrictPosition
 # from announcement.apps import BMAILER_DS
 
 
+def _scoped_academic_years():
+    """Years the current CE may put an MOU in: this campus's (and campus-less
+    ones) in multi-campus mode, every year otherwise."""
+    from . import compat
+    return compat.scope_to_campus(AcademicYear.objects.all(), '').order_by('-name')
+
+
 class MOUFinalizeForm(forms.Form):
 
     title = forms.CharField(
@@ -107,7 +114,7 @@ class MOUFinalizeForm(forms.Form):
         # else:
         #     self.fields['from_address'].initial = record.meta.get('from_address')
 
-        self.fields['academic_year'].queryset = AcademicYear.objects.all().order_by('-name')
+        self.fields['academic_year'].queryset = _scoped_academic_years()
         self.fields['academic_year'].initial = record.academic_year
         
         if record.send_on_after:
@@ -178,6 +185,8 @@ class MOUSignatorDeleteForm(forms.Form):
         widget=forms.HiddenInput,
         initial='delete_signator'
     )
+
+    mou_id = forms.CharField(required=False, widget=forms.HiddenInput)
 
     ids = forms.MultipleChoiceField(
         choices=[],
@@ -418,7 +427,7 @@ class MOUSignatorForm(forms.Form):
         if data.get('id') == '-1':
             record = MOUSignator(mou=mou, created_by=request.user, meta={})
         else:
-            record = MOUSignator.objects.get(pk=data.get('id'))
+            record = MOUSignator.objects.get(pk=data.get('id'), mou=mou)
 
         previous_role_type = record.role_type
 
@@ -577,7 +586,7 @@ class MOUInitForm(forms.Form):
 
         self.request = request
 
-        self.fields['academic_year'].queryset = AcademicYear.objects.all().order_by('-name')
+        self.fields['academic_year'].queryset = _scoped_academic_years()
 
         self.helper = FormHelper()
         self.helper.form_class = 'frm_ajax'
