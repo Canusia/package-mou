@@ -11,6 +11,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.shortcuts import get_object_or_404, redirect, render
+from django.core.exceptions import ValidationError
 from django.http import JsonResponse
 
 from cis.models.settings import Setting
@@ -40,6 +41,7 @@ from cis.menu import (
 )
 
 from rest_framework import viewsets
+from rest_framework.permissions import BasePermission, IsAuthenticated
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
@@ -49,18 +51,40 @@ from .serializers import (
     MOUSignatureSerializer
 )
 
+class IsCEUser(BasePermission):
+    """CE role only. No other portal reads these APIs; the HS-admin portal's
+    Signed MOUs page queries the models directly (views_hs_admin)."""
+
+    def has_permission(self, request, view):
+        return user_has_cis_role(request.user)
+
+
+def _scoped(model):
+    """``model``'s rows the current CE may see: all, or in multi-campus mode
+    the current campus's (compat.scope_to_campus)."""
+    from . import compat
+    path = {
+        MOU: 'academic_year',
+        MOUSignator: 'mou__academic_year',
+        MOUSignature: 'signator_template__mou__academic_year',
+    }[model]
+    return compat.scope_to_campus(model.objects.all(), path)
+
+
 class MOUViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = MOUSerializer
+    permission_classes = [IsAuthenticated, IsCEUser]
 
     def get_queryset(self):
-        records = MOU.objects.all()
+        records = _scoped(MOU)
         return records
 
 class MOUSignatorViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = MOUSignatorSerializer
+    permission_classes = [IsAuthenticated, IsCEUser]
 
     def get_queryset(self):
-        records = MOUSignator.objects.all()
+        records = _scoped(MOUSignator)
 
         if self.request.GET.get('mou_id'):
             records = records.filter(
@@ -70,10 +94,11 @@ class MOUSignatorViewSet(viewsets.ReadOnlyModelViewSet):
 
 class MOUSignatureViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = MOUSignatureSerializer
+    permission_classes = [IsAuthenticated, IsCEUser]
 
     def get_queryset(self):
         # School then signing order so the CE table matches the chain (1 first).
-        records = MOUSignature.objects.all().order_by(
+        records = _scoped(MOUSignature).order_by(
             'highschool__name',
             'signator_template__weight',
         )
@@ -297,11 +322,55 @@ def sign_mou(request, signature_id):
     return render(request, template, context)
 sign_mou.login_required=False
 
+# Which posted / queried ids each bulk action touches, by model, so a
+# multi-campus CE cannot act on another campus's rows by id.
+_SIGNATURE_ACTIONS = {'change_signature_status', 'delete_signature',
+                      'get_signature_link', 'send_signature_link'}
+_SIGNATOR_ACTIONS = {'delete_signator', 'add_signator', 'edit_mou_signator'}
+
+
+def _bulk_ids_in_scope(request, action):
+    """False when any id the action names is outside the CE's campus."""
+    from . import compat
+    if not compat.is_multi_campus():
+        return True
+    params = request.POST if request.method == 'POST' else request.GET
+    ids = set(params.getlist('ids[]')) | set(params.getlist('ids'))
+    checks = []
+    if action in _SIGNATURE_ACTIONS:
+        checks.append((MOUSignature, ids))
+    if action in _SIGNATOR_ACTIONS:
+        signator_ids = set(ids)
+        if params.get('id') and params.get('id') != '-1':
+            signator_ids.add(params.get('id'))
+        checks.append((MOUSignator, signator_ids))
+    if params.get('mou_id'):
+        checks.append((MOU, {params.get('mou_id')}))
+    try:
+        for model, wanted in checks:
+            wanted = {i for i in wanted if i}
+            if wanted and _scoped(model).filter(pk__in=wanted).count() != len(wanted):
+                return False
+    except (ValidationError, ValueError):
+        return False
+    return True
+
+
 def do_bulk_action(request):
+    # CE only (any logged-in user could reach this before, review P-1).
+    if not user_has_cis_role(request.user):
+        return JsonResponse(
+            {'status': 'error', 'message': 'You do not have access to this page.'},
+            status=403)
+
     action = request.GET.get('action')
 
     if request.method == 'POST':
         action = request.POST.get('action')
+
+    if not _bulk_ids_in_scope(request, action):
+        return JsonResponse(
+            {'status': 'error', 'message': 'Record not found.'}, status=404)
         
     if action == 'change_signature_status':
         return manage_signature_status(request)

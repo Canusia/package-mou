@@ -60,6 +60,9 @@ class MOUSignatureAPIFilterTests(TestCase):
             username='ce@example.com', email='ce@example.com',
             password='x', is_staff=True,
         )
+        # The signatures API is CE-only (review P-1).
+        from django.contrib.auth.models import Group
+        self.user.groups.add(Group.objects.get_or_create(name='ce')[0])
         from django.contrib.auth.signals import user_logged_in
         from django_login_history.models import post_login
         user_logged_in.disconnect(post_login)

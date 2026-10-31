@@ -14,7 +14,7 @@ pickers and signature seeding use every school whose own status is Active.
 """
 import importlib.util
 
-from django.db.models import F, OuterRef, Subquery
+from django.db.models import F, OuterRef, Q, Subquery
 from django.db.models.functions import Coalesce
 
 
@@ -117,6 +117,25 @@ def with_campus_status(qs, campus):
         Subquery(link.objects.filter(
             highschool=OuterRef('pk'), campus=campus).values('status')[:1]),
         F('status')))
+
+
+def scope_to_campus(qs, academic_year_path):
+    """Narrow MOU rows to the current campus in multi-campus mode.
+
+    ``academic_year_path`` is the lookup from the model to its AcademicYear
+    (``academic_year``, ``mou__academic_year``, …). Rows of a campus-less
+    year (pre-campus data) stay visible, as ``Term.by_code`` treats them.
+    Multi-campus with no campus: nothing (fail closed). Single-campus, or a
+    cis without campus scoping: unchanged.
+    """
+    if not is_multi_campus():
+        return qs
+    campus = current_campus_or_none()
+    if campus is None:
+        return qs.none()
+    return qs.filter(
+        Q(**{f'{academic_year_path}__campus': campus})
+        | Q(**{f'{academic_year_path}__campus__isnull': True}))
 
 
 def get_tenant_override(app, name):

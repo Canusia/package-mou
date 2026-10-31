@@ -29,8 +29,22 @@ A signer may instead submit a **change request** from the sign page, which moves
 - `/ce/highschools/mous/mou/<uuid>` - MOU detail/editor
 - `/ce/highschools/mous/mou/do_bulk_action` - string-dispatch endpoint for the signator / signature / highschool **table** actions (`add_signator`, `edit_mou_signator`, `delete_signator`, `delete_signature`, `add_highschools`, `get_signature_link`, `send_signature_link`, `change_signature_status`) — see `do_bulk_action(request)` in `views.py`
 - `/ce/highschools/mous/mou/actions` - `ActionRegistry` dispatch endpoint for the MOU-detail **record** actions (see below)
+- `/ce/highschools/mous/api/{mous,mou_signators,mou_signatures}/` - DRF viewsets for the CE tables
 - `/mou/sign_mou/<uuid>` - Public signing page (no login required)
 - `/mou/mou_signature_as_pdf/<uuid>` - PDF download (no login required)
+
+### Access
+
+Every `/ce/highschools/mous/` endpoint is CE-only. `do_bulk_action` returns 403
+to non-CE users itself (it had no check before; any logged-in user could list
+signature ids, i.e. signing URLs, or delete signatures), and the three API
+viewsets use `permission_classes = [IsAuthenticated, IsCEUser]`. In
+multi-campus mode `_scoped(model)` (→ `compat.scope_to_campus`) limits the
+viewsets to the current campus's academic years plus campus-less years, and
+`do_bulk_action` 404s when any id it is given (signature, signator or
+`mou_id`) is outside that scope. No other portal calls these endpoints; the
+HS-admin Signed MOUs page (`views_hs_admin.py`) queries the models directly.
+The public sign page and PDF download by signature UUID are open by design.
 
 ## Detail-Page Actions (ActionRegistry)
 
