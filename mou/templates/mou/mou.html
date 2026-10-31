@@ -3,8 +3,22 @@
 
 {% load templatehelpers %}
 {% load crispy_forms_tags %}
+{% load static %}
 
 {% block body %}
+<script>
+    // The Actions menu calls ActionRegistry.doAction, which the host's
+    // cis/logged-base.html normally loads. Some hosts (embry, rmu) do not
+    // ship it, and others load it only at the end of <body>, so decide once
+    // every inline script has run. Not init()ed: doAction needs no init, and
+    // a second frm_ajax handler would post forms twice.
+    document.addEventListener('DOMContentLoaded', function () {
+        if (window.ActionRegistry) { return; }
+        var s = document.createElement('script');
+        s.src = "{% static 'mou/js/action_registry.js' %}";
+        document.head.appendChild(s);
+    });
+</script>
 
 {% if not record.can_edit %}
     <style>
