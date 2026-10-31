@@ -151,3 +151,44 @@ class SingleCampusNoCampusTests(_Schools):
             result = self._seed(self._mou())
         self.assertIn(self.active.code, result)
         self.assertNotIn(self.inactive.code, result)
+
+
+class CampusStatusModelDetectionTests(_Schools):
+    """``with_campus_status`` decides on the HighSchoolCampus *model* and a
+    real campus, not on ``cis.highschool_scope`` (review I-1). Embry ships a
+    stand-in ``highschool_scope`` with a non-model HighSchoolCampus shim and a
+    pk-less stand-in campus."""
+
+    def _rows(self, campus):
+        qs = compat.with_campus_status(
+            HighSchool.objects.filter(pk__in=[self.active.pk, self.inactive.pk]),
+            campus)
+        return {r.pk: r.campus_status for r in qs}
+
+    def test_no_highschoolcampus_model_falls_back_even_with_highschool_scope(self):
+        from django.apps import apps
+        real = apps.get_model
+
+        def get_model(app_label, model_name=None, *a, **kw):
+            if (app_label, model_name) == ('cis', 'HighSchoolCampus') or \
+                    app_label == 'cis.HighSchoolCampus':
+                raise LookupError('no HighSchoolCampus model')
+            return real(app_label, model_name, *a, **kw)
+
+        with mock.patch.object(compat, 'HAS_CAMPUS', True), \
+                mock.patch.object(apps, 'get_model', get_model), \
+                mock.patch.dict('sys.modules', {'cis.models.highschool': None}):
+            rows = self._rows(object())
+        self.assertEqual(rows[self.active.pk], 'Active')
+        self.assertEqual(rows[self.inactive.pk], 'Inactive')
+
+    def test_campus_without_pk_falls_back(self):
+        stand_in = type('SingleCampus', (), {'pk': None})()
+        with mock.patch.object(compat, 'HAS_CAMPUS', True):
+            rows = self._rows(stand_in)
+        self.assertEqual(rows[self.active.pk], 'Active')
+
+    def test_no_campus_falls_back(self):
+        with mock.patch.object(compat, 'HAS_CAMPUS', True):
+            rows = self._rows(None)
+        self.assertEqual(rows[self.inactive.pk], 'Inactive')

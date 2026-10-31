@@ -33,8 +33,13 @@ def has_module(name):
         raise
 
 
-# cis.highschool_scope imports cis.campus_context and HighSchoolCampus, so its
-# presence implies both (package-cis >= 0.1.7a, the optional ``campus`` extra).
+# package-cis >= 0.1.7a (the optional ``campus`` extra) ships
+# cis.highschool_scope, cis.campus_context and HighSchoolCampus together, but a
+# host may ship a stand-in highschool_scope without the link model (embry), so
+# with_campus_status() checks for the model itself. A package-cis between
+# 0.1.0a and 0.1.6a has campus_context but no highschool_scope, so
+# is_multi_campus() reads False there even with MULTI_CAMPUS=True; no tenant is
+# in that window (all pins are >= 0.1.29a) and v0.0.10 required >= 0.1.7a.
 HAS_CAMPUS = has_module('cis.highschool_scope')
 HAS_TENANT_SERVICES = has_module('cis.services.tenant_services')
 HAS_COMPONENT_REGISTRY = has_module('myce.component_registry')
@@ -79,15 +84,30 @@ def picker_queryset(campus=None):
     return _picker_queryset(campus)
 
 
+def _highschool_campus_model():
+    """The ``cis.HighSchoolCampus`` model, or None when this cis has none.
+
+    Decided on its own, not from ``HAS_CAMPUS``: a host may ship a stand-in
+    ``cis.highschool_scope`` (embry) without the link model, or with a
+    non-model shim, which ``apps.get_model`` does not return.
+    """
+    from django.apps import apps
+    try:
+        return apps.get_model('cis', 'HighSchoolCampus')
+    except LookupError:
+        return None
+
+
 def with_campus_status(qs, campus):
     """Annotate ``campus_status``: the school's link status on ``campus``,
-    falling back to its own status (always its own status without campus
-    support, where there is no link table)."""
-    if not HAS_CAMPUS:
+    falling back to its own status. The fallback applies whenever there is no
+    link table (no ``HighSchoolCampus`` model) or no real campus (None, or a
+    stand-in with no pk), whatever ``HAS_CAMPUS`` says."""
+    link = _highschool_campus_model()
+    if link is None or getattr(campus, 'pk', None) is None:
         return qs.annotate(campus_status=F('status'))
-    from cis.models.highschool import HighSchoolCampus
     return qs.annotate(campus_status=Coalesce(
-        Subquery(HighSchoolCampus.objects.filter(
+        Subquery(link.objects.filter(
             highschool=OuterRef('pk'), campus=campus).values('status')[:1]),
         F('status')))
 
