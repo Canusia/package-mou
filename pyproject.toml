@@ -10,7 +10,7 @@ authors = [
 ]
 description = "MyCE — MOU management with multi-stage digital signatures"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 # Declared here, not only in setup.cfg: this [project] table has no
 # `dynamic = ["dependencies"]`, so setuptools discards setup.cfg install_requires.
 dependencies = [

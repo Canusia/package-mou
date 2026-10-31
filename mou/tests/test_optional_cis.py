@@ -50,6 +50,14 @@ class MetadataTests(SimpleTestCase):
         self.assertTrue(any('myce_cis' in d
                             for d in project['optional-dependencies']['campus']))
 
+    def test_python_floor_matches_tomllib_use(self):
+        # These tests import tomllib (3.11+); both metadata files say so.
+        project = tomllib.loads(self._read('pyproject.toml'))['project']
+        cfg = configparser.ConfigParser()
+        cfg.read_string(self._read('setup.cfg'))
+        self.assertEqual(project['requires-python'], '>=3.11')
+        self.assertEqual(cfg['options']['python_requires'].strip(), '>=3.11')
+
 
 class HasModuleTests(SimpleTestCase):
     def test_present(self):
@@ -61,6 +69,21 @@ class HasModuleTests(SimpleTestCase):
     def test_missing_parent(self):
         # find_spec('a.b') raises when package a is absent: still "missing".
         self.assertFalse(compat.has_module('cis.no_such_pkg_xyz.tenant_services'))
+
+    def test_unrelated_missing_module_reraises(self):
+        # A module that exists but fails importing something else is a real
+        # error, not "cis lacks this feature" (review M-4).
+        err = ModuleNotFoundError("No module named 'somethingelse'",
+                                  name='somethingelse')
+        with mock.patch('importlib.util.find_spec', side_effect=err):
+            with self.assertRaises(ModuleNotFoundError):
+                compat.has_module('cis.highschool_scope')
+
+    def test_other_import_error_reraises(self):
+        with mock.patch('importlib.util.find_spec',
+                        side_effect=ImportError('broken inside cis')):
+            with self.assertRaises(ImportError):
+                compat.has_module('cis.highschool_scope')
 
 
 class TenantOverrideTests(SimpleTestCase):
@@ -192,3 +215,44 @@ class CampusStatusModelDetectionTests(_Schools):
         with mock.patch.object(compat, 'HAS_CAMPUS', True):
             rows = self._rows(None)
         self.assertEqual(rows[self.inactive.pk], 'Inactive')
+
+
+class ModalWordingTests(_Schools):
+    """"this campus" only when the campus is real (review M-3)."""
+
+    def _header(self, campus):
+        captured = {}
+
+        def fake_render(request, template, context):
+            captured.update(context)
+
+        request = RequestFactory().get('/', {'mou_id': str(uuid.uuid4())})
+        with mock.patch.object(compat, 'HAS_CAMPUS', True), \
+                mock.patch.object(compat, 'current_campus_or_none',
+                                  return_value=campus), \
+                mock.patch.object(compat, 'picker_queryset',
+                                  return_value=HighSchool.objects.all()), \
+                mock.patch.object(views, 'render', fake_render):
+            views.add_highschools(request)
+        return str(captured['form_header'])
+
+    def test_stand_in_campus_says_active_schools(self):
+        header = self._header(type('SingleCampus', (), {'pk': None})())
+        self.assertIn('Active schools.', header)
+        self.assertNotIn('this campus', header)
+
+    def test_no_link_model_says_active_schools(self):
+        with mock.patch.object(compat, '_highschool_campus_model',
+                               return_value=None):
+            header = self._header(object())
+        self.assertNotIn('this campus', header)
+
+    def test_real_campus_says_this_campus(self):
+        if not compat.HAS_CAMPUS:
+            self.skipTest('cis.highschool_scope unavailable')
+        from django.conf import settings
+        from cis.models.course import Campus
+        campus = Campus.objects.create(
+            name=f'C-{_sfx()}',
+            code=f'{settings.CAMPUS_CODE_PREFIX}_{_sfx()[:6]}')
+        self.assertIn('this campus', self._header(campus))

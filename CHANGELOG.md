@@ -21,7 +21,8 @@ Releases are tagged on `Canusia/package-mou` and consumed by each tenant through
   It is used only when cis has that model and the campus is real (has a pk);
   otherwise the school's own status is shown. Hosts with a stand-in
   `cis.highschool_scope` (embry) can drop their non-model `HighSchoolCampus`
-  shim once they run this release.
+  shim once they run this release. The modal's header says "Schools active on
+  this campus" only in that case, otherwise "Active schools".
 * **The Duplicate/Delete MOU menu works on hosts without
   `action_registry.js`.** The package ships `mou/js/action_registry.js` and
   `mou.html` loads it only when `window.ActionRegistry` is missing.

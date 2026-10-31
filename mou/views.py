@@ -430,7 +430,7 @@ def add_highschools(request):
         'form_submit_button_title': 'Save',
         'form_header': mark_safe(
             '<p class="alert alert-info mb-3">'
-            + ('Schools active on this campus. ' if compat.HAS_CAMPUS
+            + ('Schools active on this campus. ' if compat.has_campus_links(campus)
                else 'Active schools. ')
             + 'Filter by name, CEEB, or district. '
             'Use the header checkbox to select all currently visible rows; selections '

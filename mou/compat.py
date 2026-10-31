@@ -98,14 +98,21 @@ def _highschool_campus_model():
         return None
 
 
+def has_campus_links(campus):
+    """True when ``campus`` is a real campus on a cis with the link table, so
+    a picker scoped to it really is "this campus's" schools."""
+    return (_highschool_campus_model() is not None
+            and getattr(campus, 'pk', None) is not None)
+
+
 def with_campus_status(qs, campus):
     """Annotate ``campus_status``: the school's link status on ``campus``,
     falling back to its own status. The fallback applies whenever there is no
     link table (no ``HighSchoolCampus`` model) or no real campus (None, or a
     stand-in with no pk), whatever ``HAS_CAMPUS`` says."""
-    link = _highschool_campus_model()
-    if link is None or getattr(campus, 'pk', None) is None:
+    if not has_campus_links(campus):
         return qs.annotate(campus_status=F('status'))
+    link = _highschool_campus_model()
     return qs.annotate(campus_status=Coalesce(
         Subquery(link.objects.filter(
             highschool=OuterRef('pk'), campus=campus).values('status')[:1]),
