@@ -912,9 +912,10 @@ class AddHighSchoolForm(forms.Form):
     def __init__(self, mou_id=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        from cis.highschool_scope import picker_queryset
-        # Schools active on the current campus. Another campus's school is not
-        # offered, and a POSTed id for one fails validation.
+        from .compat import picker_queryset
+        # Schools active on the current campus (every Active school on a cis
+        # without campus scoping). Another campus's school is not offered, and
+        # a POSTed id for one fails validation.
         self.fields['highschools'].queryset = picker_queryset()
 
         self.fields['action'].initial = kwargs.get('action', 'add_highschools')

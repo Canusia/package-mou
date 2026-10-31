@@ -9,9 +9,17 @@ package code. Each shortcode now resolves an opt-in override through
 The override receives (signature, default_queryset) so a tenant can refine the
 package's selection rather than restate it.
 """
+import unittest
 from unittest.mock import MagicMock, patch
 
 from django.test import TestCase
+
+from ..compat import has_module
+
+# These patch cis.services.tenant_services; a cis without that seam has no
+# overrides at all (package-mou#2, covered by test_optional_cis).
+if not has_module('cis.services.tenant_services'):
+    raise unittest.SkipTest('cis.services.tenant_services unavailable')
 
 from ..models import _tenant_mou_override
 from .factories import make_mou_with_chain, make_certificate, make_course

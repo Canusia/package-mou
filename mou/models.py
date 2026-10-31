@@ -53,7 +53,7 @@ def _tenant_mou_override(name):
     imports model classes at its own module level, so resolving one while this
     module is still importing risks AppRegistryNotReady.
     """
-    from cis.services.tenant_services import get_tenant_override
+    from .compat import get_tenant_override
     return get_tenant_override('mou', name)
 
 
@@ -285,15 +285,16 @@ class MOU(models.Model):
             return (False, 'MOU is not finalized')
         
         # Only the schools active on the MOU's campus (its academic year's),
-        # else the current campus. No campus (multi-campus, no context): none.
-        from cis.campus_context import current_campus_or_none
-        from cis.highschool_scope import campus_highschools
-        campus = getattr(self.academic_year, 'campus', None) or current_campus_or_none()
-        if campus is None:
+        # else the current campus. Multi-campus with no campus fails closed:
+        # none. Single-campus with no campus, or a cis without campus scoping
+        # (package-mou#2), seeds every Active school, as before campus links.
+        from . import compat
+        campus = getattr(self.academic_year, 'campus', None) or compat.current_campus_or_none()
+        if campus is None and compat.is_multi_campus():
             logger.warning(
                 'MOU %s: no campus to seed signatures for; none created.', self.pk)
             return {}
-        highschools = campus_highschools(campus).order_by('name')
+        highschools = compat.campus_highschools(campus).order_by('name')
 
         signators = MOUSignator.objects.filter(
             mou=self

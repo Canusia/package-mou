@@ -156,6 +156,17 @@ allowed = cfg.get('available_shortcodes')  # may be None on fresh install
 - `signature_link_export` - CSV of pending signatures with URLs
 - `mou_pdf_export` - ZIP of signed MOUs as PDFs
 
+## Optional cis features (`mou/compat.py`)
+
+`myce_cis` is the optional `campus` extra, not a requirement (package-mou#2):
+tenants with an in-repo `cis` must still install and run this package. Never
+import `cis.highschool_scope`, `cis.campus_context`, `HighSchoolCampus`,
+`cis.services.tenant_services` or `myce.component_registry` directly — go
+through `mou/compat.py` (`find_spec`-guarded; pre-campus fallback = every
+school whose own status is Active). `mou/_actions.py` is a vendored copy of
+`ActionRegistry`; keep it identical to the original. Tests that need campus
+support skip when `cis.highschool_scope` is missing.
+
 ## Integration
 
 - Links to `cis.AcademicYear`, `cis.HighSchool`, `cis.CustomUser`

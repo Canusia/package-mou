@@ -3,6 +3,25 @@
 Releases are tagged on `Canusia/package-mou` and consumed by each tenant through the
 `git+https://…@<tag>` pin in `webapp/requirements.txt`.
 
+## Unreleased
+
+### Fixed
+
+* **Tenants with an in-repo `cis`, or no campus, can install and run the
+  package again (#2).** `myce_cis` moved from the install requirements to the
+  optional `campus` extra (`myce_mou[campus]`) in both `pyproject.toml` and
+  `setup.cfg`. Every package-cis / host-only import now goes through
+  `mou/compat.py`, which checks with `importlib.util.find_spec`: without
+  `cis.highschool_scope` the Add High School(s) picker and modal list every
+  Active school (status shown is the school's own), and finalizing seeds them;
+  without `cis.services.tenant_services` there are no list-shortcode overrides;
+  without `myce.component_registry` the detail-page actions use a vendored
+  `ActionRegistry` (`mou/_actions.py`).
+* **Single-campus deployments with no campus no longer seed zero signatures.**
+  `MOU.initialize_signatures()` fails closed (none, with a warning) only in
+  multi-campus mode; a single-campus deployment with no campus seeds every
+  Active school, as before campus scoping. Multi-campus behaviour is unchanged.
+
 ## v0.0.8 — 2026-08-19
 
 ### Added

@@ -1,5 +1,13 @@
 """Campus-scoped school picker on the MOU "Add High School(s)" form
 (cis HighSchoolCampus)."""
+import importlib.util
+import unittest
+
+# A cis without campus scoping (in-repo cis) has no HighSchoolCampus
+# (package-mou#2); test_optional_cis covers the pre-campus behaviour there.
+if not importlib.util.find_spec('cis.highschool_scope'):
+    raise unittest.SkipTest('cis.highschool_scope unavailable (in-repo cis)')
+
 import uuid
 
 from django.conf import settings
