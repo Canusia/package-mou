@@ -46,6 +46,7 @@ class MOUConfig(AppConfig):
 
     def ready(self):
         import mou.signals
+        from . import menu  # noqa: F401  sidebar items (cis.menu_registry)
            
 class DevMOUConfig(AppConfig):
     name = 'mou.mou'
@@ -91,3 +92,4 @@ class DevMOUConfig(AppConfig):
 
     def ready(self):
         import mou.mou.signals
+        from . import menu  # noqa: F401  sidebar items (cis.menu_registry)
