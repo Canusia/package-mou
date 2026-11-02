@@ -3,7 +3,12 @@
 Releases are tagged on `Canusia/package-mou` and consumed by each tenant through the
 `git+https://…@<tag>` pin in `webapp/requirements.txt`.
 
-## Unreleased
+## v0.0.11 — 2026-11-02
+
+### Added
+
+* **MOUs sidebar item** (under High Schools) is published to the cis menu
+  registry (myce_cis v0.1.43a+); on an older cis nothing changes.
 
 ### Fixed
 
@@ -51,6 +56,12 @@ Releases are tagged on `Canusia/package-mou` and consumed by each tenant through
   or delete signatures. In multi-campus mode they only see and act on MOUs of
   the current campus's academic years (plus campus-less years). The public
   `/mou/sign_mou/<uuid>` page is unchanged.
+* **Child records must belong to the MOU on the page (#2 re-review).** Signator
+  and signature ids posted to the bulk endpoint or the detail page must belong
+  to that page's MOU (`mou_id`, now required to delete signators); a malformed
+  id is a 404 instead of a 500. The academic-year choices on the new-MOU and
+  finalize forms are limited to the current campus's (plus campus-less) years
+  in multi-campus mode.
 
 ### Changed
 
